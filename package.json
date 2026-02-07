@@ -1,0 +1,48 @@
+{
+  "name": "clawcontrol",
+  "version": "0.1.0",
+  "description": "CLI tool for deploying and managing OpenClaw instances on VPS providers",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "clawcontrol": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.tsx",
+    "build": "tsup",
+    "start": "bun dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "openclaw",
+    "cli",
+    "vps",
+    "deployment",
+    "hetzner",
+    "tui"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.25.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.1.77",
+    "@opentui/react": "^0.1.77",
+    "react": "^19.0.0",
+    "ssh2": "^1.16.0",
+    "open": "^10.1.0",
+    "chalk": "^5.4.1",
+    "ora": "^8.1.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/ssh2": "^1.15.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
