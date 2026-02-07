@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useKeyboard } from "@opentui/react";
 import open from "open";
-import { spawn } from "child_process";
-import { platform } from "os";
-import { writeFileSync, chmodSync, unlinkSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
 import type { AppContext } from "../App.js";
 import {
   startDeployment,
   type DeploymentProgress,
 } from "../services/deployment.js";
 import { readDeploymentState, getSSHKeyPath } from "../services/config.js";
+import { openTerminalWithCommand, detectTerminal, getTerminalDisplayName } from "../utils/terminal.js";
 
 interface Props {
   context: AppContext;
@@ -58,73 +54,21 @@ export function DeployingView({ context }: Props) {
   const handleSpawnTerminal = useCallback(async (deploymentName: string, serverIp: string, command: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       try {
-        addLog(`Opening terminal for interactive setup...`);
+        const terminal = detectTerminal();
+        const terminalName = getTerminalDisplayName(terminal.app);
+        addLog(`Opening ${terminalName} for interactive setup...`);
         setDeployState("waiting_terminal");
         setTerminalResolve(() => resolve);
 
         const sshKeyPath = getSSHKeyPath(deploymentName);
         const sshCommand = `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${serverIp} -t '${command}; echo ""; echo "=== Setup complete! You can close this terminal window. ==="; read -p "Press Enter to close..."'`;
 
-        const os = platform();
+        const result = openTerminalWithCommand(sshCommand);
 
-        if (os === "darwin") {
-          // macOS: Use osascript to open Terminal.app
-          const appleScript = `
-            tell application "Terminal"
-              activate
-              set newTab to do script "${sshCommand.replace(/"/g, '\\"')}"
-            end tell
-          `;
-
-          const proc = spawn("osascript", ["-e", appleScript], {
-            stdio: "ignore",
-            detached: true,
-          });
-
-          proc.on("error", (err) => {
-            addLog(`Failed to open terminal: ${err.message}`);
-            reject(err);
-          });
-
-          proc.unref();
-          addLog("Terminal window opened. Complete the setup there.");
-        } else if (os === "linux") {
-          // Linux: Try common terminal emulators
-          const scriptPath = join(tmpdir(), `claw-setup-${Date.now()}.sh`);
-          writeFileSync(scriptPath, `#!/bin/bash\n${sshCommand}\nrm -f "${scriptPath}"\n`, { mode: 0o755 });
-          chmodSync(scriptPath, 0o755);
-
-          // Try terminals in order of preference
-          const terminals = [
-            { cmd: "gnome-terminal", args: ["--", scriptPath] },
-            { cmd: "konsole", args: ["-e", scriptPath] },
-            { cmd: "xfce4-terminal", args: ["-e", scriptPath] },
-            { cmd: "xterm", args: ["-e", scriptPath] },
-          ];
-
-          let launched = false;
-          for (const terminal of terminals) {
-            try {
-              const proc = spawn(terminal.cmd, terminal.args, {
-                stdio: "ignore",
-                detached: true,
-              });
-              proc.unref();
-              launched = true;
-              addLog(`Terminal window opened (${terminal.cmd}). Complete the setup there.`);
-              break;
-            } catch {
-              // Try next terminal
-            }
-          }
-
-          if (!launched) {
-            unlinkSync(scriptPath);
-            reject(new Error("Could not find a supported terminal emulator. Please install gnome-terminal, konsole, xfce4-terminal, or xterm."));
-          }
+        if (result.success) {
+          addLog(`${terminalName} opened. Complete the setup there.`);
         } else {
-          // Windows or other OS
-          reject(new Error(`Unsupported operating system: ${os}. Please use macOS or Linux.`));
+          reject(new Error(result.error || "Failed to open terminal"));
         }
       } catch (err) {
         reject(err);

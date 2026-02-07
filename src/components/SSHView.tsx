@@ -1,91 +1,47 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useKeyboard } from "@opentui/react";
 import type { AppContext } from "../App.js";
-import { connectToDeployment, type SSHConnection } from "../services/ssh.js";
-import type { ClientChannel } from "ssh2";
+import { getSSHKeyPath } from "../services/config.js";
+import { detectTerminal, openTerminalWithCommand, getTerminalDisplayName } from "../utils/terminal.js";
 
 interface Props {
   context: AppContext;
 }
 
-type ViewState = "selecting" | "connecting" | "connected" | "error";
+type ViewState = "selecting" | "connected" | "error";
 
 export function SSHView({ context }: Props) {
   const [viewState, setViewState] = useState<ViewState>("selecting");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [output, setOutput] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState("");
-
-  const sshRef = useRef<SSHConnection | null>(null);
-  const shellRef = useRef<ClientChannel | null>(null);
+  const [connectedDeployment, setConnectedDeployment] = useState<string | null>(null);
+  const [terminalName, setTerminalName] = useState<string>("");
 
   const deployedDeployments = context.deployments.filter(
     (d) => d.state.status === "deployed" && d.state.serverIp
   );
 
-  useEffect(() => {
-    return () => {
-      if (shellRef.current) {
-        shellRef.current.end();
-      }
-      if (sshRef.current?.isConnected()) {
-        sshRef.current.disconnect();
-      }
-    };
-  }, []);
+  const launchNativeSSH = useCallback((deploymentName: string, serverIp: string) => {
+    const sshKeyPath = getSSHKeyPath(deploymentName);
+    const sshCommand = `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${serverIp}`;
 
-  const connectToServer = async (deploymentName: string, serverIp: string) => {
-    setViewState("connecting");
-    setOutput([`Connecting to ${serverIp}...`]);
+    const terminal = detectTerminal();
+    setTerminalName(getTerminalDisplayName(terminal.app));
 
-    try {
-      const ssh = await connectToDeployment(deploymentName, serverIp);
-      sshRef.current = ssh;
+    const result = openTerminalWithCommand(sshCommand);
 
-      const shell = await ssh.shell();
-      shellRef.current = shell;
-
-      shell.on("data", (data: Buffer) => {
-        const text = data.toString();
-        setOutput((prev) => [...prev.slice(-500), ...text.split("\n")]);
-      });
-
-      shell.on("close", () => {
-        setOutput((prev) => [...prev, "\n[Connection closed]"]);
-        setViewState("selecting");
-      });
-
+    if (result.success) {
+      setConnectedDeployment(deploymentName);
       setViewState("connected");
-      setOutput((prev) => [...prev, "Connected! Type commands below.\n"]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } else {
+      setError(result.error || "Failed to open terminal");
       setViewState("error");
     }
-  };
-
-  const sendCommand = (command: string) => {
-    if (shellRef.current) {
-      shellRef.current.write(command + "\n");
-    }
-  };
-
-  const disconnect = () => {
-    if (shellRef.current) {
-      shellRef.current.end();
-      shellRef.current = null;
-    }
-    if (sshRef.current?.isConnected()) {
-      sshRef.current.disconnect();
-      sshRef.current = null;
-    }
-    setViewState("selecting");
-    setOutput([]);
-  };
+  }, []);
 
   const selectedDeployment = deployedDeployments[selectedIndex];
 
-  // Handle keyboard events for non-connected states
+  // Handle keyboard events
   useKeyboard((key) => {
     if (deployedDeployments.length === 0) {
       context.navigateTo("home");
@@ -98,13 +54,16 @@ export function SSHView({ context }: Props) {
       } else if (key.name === "down" && selectedIndex < deployedDeployments.length - 1) {
         setSelectedIndex(selectedIndex + 1);
       } else if (key.name === "return") {
-        connectToServer(selectedDeployment.config.name, selectedDeployment.state.serverIp!);
+        launchNativeSSH(selectedDeployment.config.name, selectedDeployment.state.serverIp!);
       } else if (key.name === "escape") {
         context.navigateTo("home");
       }
+    } else if (viewState === "connected") {
+      if (key.name === "return" || key.name === "escape") {
+        context.navigateTo("home");
+      }
     } else if (viewState === "error") {
-      setViewState("selecting");
-      setError(null);
+      context.navigateTo("home");
     }
   });
 
@@ -132,6 +91,9 @@ export function SSHView({ context }: Props) {
   }
 
   if (viewState === "selecting") {
+    const terminal = detectTerminal();
+    const terminalDisplayName = getTerminalDisplayName(terminal.app);
+
     return (
       <box flexDirection="column" width="100%" height="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
@@ -144,6 +106,7 @@ export function SSHView({ context }: Props) {
           borderStyle="single"
           borderColor="gray"
           padding={1}
+          marginBottom={1}
         >
           {deployedDeployments.map((deployment, index) => {
             const isSelected = index === selectedIndex;
@@ -166,18 +129,52 @@ export function SSHView({ context }: Props) {
           })}
         </box>
 
-        <text fg="gray" marginTop={2}>Arrow keys to select | Enter to connect | Esc to go back</text>
+        <box flexDirection="row" marginBottom={1}>
+          <text fg="gray">Detected: </text>
+          <text fg="green">{terminalDisplayName}</text>
+          {terminal.canOpenTab ? (
+            <text fg="gray"> (will open new tab)</text>
+          ) : (
+            <text fg="gray"> (will open Terminal.app)</text>
+          )}
+        </box>
+
+        <text fg="gray">Arrow keys to select | Enter to connect | Esc to go back</text>
       </box>
     );
   }
 
-  if (viewState === "connecting") {
+  if (viewState === "connected") {
     return (
       <box flexDirection="column" width="100%" height="100%" padding={1}>
-        <text fg="cyan">Connecting...</text>
-        <text fg="yellow" marginTop={1}>
-          {output[output.length - 1] || "Establishing SSH connection..."}
-        </text>
+        <box flexDirection="row" marginBottom={2}>
+          <text fg="green">/ssh</text>
+          <text fg="gray"> - Connected to {connectedDeployment}</text>
+        </box>
+
+        <box
+          flexDirection="column"
+          borderStyle="double"
+          borderColor="green"
+          padding={1}
+          marginBottom={1}
+        >
+          <text fg="green">SSH Session Opened</text>
+          <text fg="white" marginTop={1}>A new {terminalName} window/tab has been opened.</text>
+        </box>
+
+        <box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor="gray"
+          padding={1}
+          marginBottom={1}
+        >
+          <text fg="white">Your SSH session is running in {terminalName}.</text>
+          <text fg="white" marginTop={1}>When you're done, type 'exit' or close the tab.</text>
+        </box>
+
+        <text fg="yellow" marginTop={1}>Press Enter or Esc to return to ClawControl</text>
       </box>
     );
   }
@@ -186,7 +183,7 @@ export function SSHView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" height="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="red">Connection Error</text>
+          <text fg="red">SSH Error</text>
         </box>
 
         <box
@@ -198,55 +195,10 @@ export function SSHView({ context }: Props) {
           <text fg="red">{error}</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to go back</text>
+        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }
 
-  // Connected state - need input for SSH commands
-  return (
-    <box flexDirection="column" width="100%" height="100%" padding={1}>
-      <box flexDirection="row" marginBottom={1}>
-        <text fg="green">SSH Connected</text>
-        <text fg="gray"> | Ctrl+D to disconnect</text>
-      </box>
-
-      {/* Terminal output */}
-      <box
-        flexDirection="column"
-        borderStyle="single"
-        borderColor="gray"
-        padding={1}
-        flexGrow={1}
-        overflow="hidden"
-      >
-        <box flexDirection="column">
-          {output.slice(-20).map((line, i) => (
-            <text key={i} fg="white">{line}</text>
-          ))}
-        </box>
-      </box>
-
-      {/* Command input */}
-      <text fg="green" marginTop={1}>$ Command:</text>
-      <input
-        value={inputValue}
-        focused
-        onInput={(value) => setInputValue(value)}
-        onSubmit={(value) => {
-          sendCommand(value);
-          setInputValue("");
-        }}
-        onKeyDown={(e) => {
-          if (e.ctrl && e.name === "d") {
-            disconnect();
-          } else if (e.ctrl && e.name === "c") {
-            if (shellRef.current) {
-              shellRef.current.write("\x03");
-            }
-          }
-        }}
-      />
-    </box>
-  );
+  return null;
 }
