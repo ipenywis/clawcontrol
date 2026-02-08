@@ -3,6 +3,7 @@ import { useKeyboard } from "@opentui/react";
 import type { AppContext } from "../App.js";
 import { connectToDeployment, type SSHConnection } from "../services/ssh.js";
 import { getOpenClawLogs } from "../services/setup/index.js";
+import { t, logLevelColor } from "../theme.js";
 
 interface Props {
   context: AppContext;
@@ -143,21 +144,21 @@ export function LogsView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="cyan">/logs</text>
-          <text fg="gray"> - View deployment logs</text>
+          <text fg={t.accent}>/logs</text>
+          <text fg={t.fg.secondary}> - View deployment logs</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="yellow"
+          borderColor={t.border.default}
           padding={1}
         >
-          <text fg="yellow">No deployed instances found!</text>
-          <text fg="gray" marginTop={1}>Deploy an instance first with /deploy</text>
+          <text fg={t.status.warning}>No deployed instances found!</text>
+          <text fg={t.fg.secondary} marginTop={1}>Deploy an instance first with /deploy</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }
@@ -166,14 +167,14 @@ export function LogsView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="cyan">/logs</text>
-          <text fg="gray"> - Select a deployment</text>
+          <text fg={t.accent}>/logs</text>
+          <text fg={t.fg.secondary}> - Select a deployment</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="gray"
+          borderColor={t.border.default}
           padding={1}
         >
           {deployedDeployments.map((deployment, index) => {
@@ -183,21 +184,21 @@ export function LogsView({ context }: Props) {
               <box
                 key={deployment.config.name}
                 flexDirection="row"
-                backgroundColor={isSelected ? "blue" : undefined}
+                backgroundColor={isSelected ? t.selection.bg : undefined}
               >
-                <text fg={isSelected ? "white" : "gray"}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary}>
                   {isSelected ? "> " : "  "}
                 </text>
-                <text fg={isSelected ? "white" : "gray"} width={25}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary} width={25}>
                   {deployment.config.name}
                 </text>
-                <text fg="cyan">{deployment.state.serverIp}</text>
+                <text fg={t.accent}>{deployment.state.serverIp}</text>
               </box>
             );
           })}
         </box>
 
-        <text fg="gray" marginTop={2}>Arrow keys to select | Enter to view logs | Esc to go back</text>
+        <text fg={t.fg.muted} marginTop={2}>Arrow keys to select | Enter to view logs | Esc to go back</text>
       </box>
     );
   }
@@ -205,8 +206,8 @@ export function LogsView({ context }: Props) {
   if (viewState === "loading") {
     return (
       <box flexDirection="column" width="100%" padding={1}>
-        <text fg="cyan">Loading logs...</text>
-        <text fg="yellow" marginTop={1}>Fetching OpenClaw logs from server...</text>
+        <text fg={t.accent}>Loading logs...</text>
+        <text fg={t.fg.secondary} marginTop={1}>Fetching OpenClaw logs from server...</text>
       </box>
     );
   }
@@ -215,19 +216,19 @@ export function LogsView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="red">Error Loading Logs</text>
+          <text fg={t.status.error}>Error Loading Logs</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="red"
+          borderColor={t.status.error}
           padding={1}
         >
-          <text fg="red">{error}</text>
+          <text fg={t.status.error}>{error}</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to go back</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to go back</text>
       </box>
     );
   }
@@ -239,15 +240,15 @@ export function LogsView({ context }: Props) {
     <box flexDirection="column" width="100%" padding={1}>
       {/* Header */}
       <box flexDirection="row" marginBottom={1}>
-        <text fg="cyan">Logs: {selectedDeployment.config.name}</text>
-        <text fg="gray"> | </text>
-        <text fg={autoRefresh ? "green" : "gray"}>
+        <text fg={t.accent}>Logs: {selectedDeployment.config.name}</text>
+        <text fg={t.fg.muted}> | </text>
+        <text fg={autoRefresh ? t.status.success : t.fg.muted}>
           Auto: {autoRefresh ? "ON (5s)" : "OFF"}
         </text>
         {lastFetched && (
           <>
-            <text fg="gray"> | </text>
-            <text fg="gray">Fetched: {lastFetched.toLocaleTimeString()}</text>
+            <text fg={t.fg.muted}> | </text>
+            <text fg={t.fg.muted}>Fetched: {lastFetched.toLocaleTimeString()}</text>
           </>
         )}
       </box>
@@ -256,7 +257,7 @@ export function LogsView({ context }: Props) {
       <box
         flexDirection="column"
         borderStyle="single"
-        borderColor="gray"
+        borderColor={t.border.default}
         padding={1}
       >
         <box flexDirection="column">
@@ -264,29 +265,21 @@ export function LogsView({ context }: Props) {
             const parsed = parseLogLine(line);
             if (!parsed) return null;
 
-            const levelColor = parsed.level === "error"
-              ? "red"
-              : parsed.level === "warn"
-              ? "yellow"
-              : parsed.level === "debug"
-              ? "gray"
-              : "white";
-
             const displayLine = parsed.timestamp
               ? `${parsed.timestamp} ${truncateLine(parsed.message, 100)}`
               : truncateLine(parsed.message, 120);
 
             return (
-              <text key={i} fg={levelColor}>{displayLine}</text>
+              <text key={i} fg={logLevelColor(parsed.level)}>{displayLine}</text>
             );
           })}
         </box>
       </box>
 
       <box flexDirection="row" marginTop={1}>
-        <text fg="gray">R: Refresh | A: Toggle auto-refresh | Esc: Back</text>
-        <text fg="gray"> | </text>
-        <text fg="cyan">Showing last {visibleLogs.length} lines</text>
+        <text fg={t.fg.muted}>R: Refresh | A: Toggle auto-refresh | Esc: Back</text>
+        <text fg={t.fg.muted}> | </text>
+        <text fg={t.accent}>Showing last {visibleLogs.length} lines</text>
       </box>
     </box>
   );

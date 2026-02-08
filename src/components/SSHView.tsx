@@ -3,6 +3,7 @@ import { useKeyboard } from "@opentui/react";
 import type { AppContext } from "../App.js";
 import { getSSHKeyPath } from "../services/config.js";
 import { detectTerminal, openTerminalWithCommand, getTerminalDisplayName } from "../utils/terminal.js";
+import { t } from "../theme.js";
 
 interface Props {
   context: AppContext;
@@ -71,21 +72,21 @@ export function SSHView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="cyan">/ssh</text>
-          <text fg="gray"> - SSH into deployment</text>
+          <text fg={t.accent}>/ssh</text>
+          <text fg={t.fg.secondary}> - SSH into deployment</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="yellow"
+          borderColor={t.border.default}
           padding={1}
         >
-          <text fg="yellow">No deployed instances found!</text>
-          <text fg="gray" marginTop={1}>Deploy an instance first with /deploy</text>
+          <text fg={t.status.warning}>No deployed instances found!</text>
+          <text fg={t.fg.secondary} marginTop={1}>Deploy an instance first with /deploy</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }
@@ -97,14 +98,14 @@ export function SSHView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="cyan">/ssh</text>
-          <text fg="gray"> - Select a deployment to connect</text>
+          <text fg={t.accent}>/ssh</text>
+          <text fg={t.fg.secondary}> - Select a deployment to connect</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="gray"
+          borderColor={t.border.default}
           padding={1}
           marginBottom={1}
         >
@@ -115,27 +116,27 @@ export function SSHView({ context }: Props) {
               <box
                 key={deployment.config.name}
                 flexDirection="row"
-                backgroundColor={isSelected ? "blue" : undefined}
+                backgroundColor={isSelected ? t.selection.bg : undefined}
               >
-                <text fg={isSelected ? "white" : "gray"}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary}>
                   {isSelected ? "> " : "  "}
                 </text>
-                <text fg={isSelected ? "white" : "gray"} width={25}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary} width={25}>
                   {deployment.config.name}
                 </text>
-                <text fg="cyan">{deployment.state.serverIp}</text>
+                <text fg={t.accent}>{deployment.state.serverIp}</text>
               </box>
             );
           })}
         </box>
 
         <box flexDirection="row" marginBottom={1}>
-          <text fg="gray">Terminal: </text>
-          <text fg="green">{terminalDisplayName}</text>
-          <text fg="gray"> (will open in a new window)</text>
+          <text fg={t.fg.secondary}>Terminal: </text>
+          <text fg={t.status.success}>{terminalDisplayName}</text>
+          <text fg={t.fg.secondary}> (will open in a new window)</text>
         </box>
 
-        <text fg="gray">Arrow keys to select | Enter to connect | Esc to go back</text>
+        <text fg={t.fg.muted}>Arrow keys to select | Enter to connect | Esc to go back</text>
       </box>
     );
   }
@@ -144,33 +145,33 @@ export function SSHView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="green">/ssh</text>
-          <text fg="gray"> - Connected to {connectedDeployment}</text>
+          <text fg={t.status.success}>/ssh</text>
+          <text fg={t.fg.secondary}> - Connected to {connectedDeployment}</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="double"
-          borderColor="green"
+          borderColor={t.status.success}
           padding={1}
           marginBottom={1}
         >
-          <text fg="green">SSH Session Opened</text>
-          <text fg="white" marginTop={1}>A new {terminalName} window/tab has been opened.</text>
+          <text fg={t.status.success}>SSH Session Opened</text>
+          <text fg={t.fg.primary} marginTop={1}>A new {terminalName} window/tab has been opened.</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="gray"
+          borderColor={t.border.default}
           padding={1}
           marginBottom={1}
         >
-          <text fg="white">Your SSH session is running in {terminalName}.</text>
-          <text fg="white" marginTop={1}>When you're done, type 'exit' or close the tab.</text>
+          <text fg={t.fg.primary}>Your SSH session is running in {terminalName}.</text>
+          <text fg={t.fg.primary} marginTop={1}>When you're done, type 'exit' or close the tab.</text>
         </box>
 
-        <text fg="yellow" marginTop={1}>Press Enter or Esc to return to ClawControl</text>
+        <text fg={t.fg.muted} marginTop={1}>Press Enter or Esc to return to ClawControl</text>
       </box>
     );
   }
@@ -179,19 +180,19 @@ export function SSHView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="red">SSH Error</text>
+          <text fg={t.status.error}>SSH Error</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="red"
+          borderColor={t.status.error}
           padding={1}
         >
-          <text fg="red">{error}</text>
+          <text fg={t.status.error}>{error}</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }

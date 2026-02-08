@@ -8,6 +8,7 @@ import {
 } from "../services/deployment.js";
 import { readDeploymentState, getSSHKeyPath } from "../services/config.js";
 import { openTerminalWithCommand, detectTerminal, getTerminalDisplayName } from "../utils/terminal.js";
+import { t } from "../theme.js";
 
 interface Props {
   context: AppContext;
@@ -159,13 +160,13 @@ export function DeployingView({ context }: Props) {
     return (
       <box flexDirection="column" marginBottom={1}>
         <box flexDirection="row">
-          <text fg="cyan">[</text>
-          <text fg="green">{"█".repeat(filled)}</text>
-          <text fg="gray">{"░".repeat(empty)}</text>
-          <text fg="cyan">]</text>
-          <text fg="white"> {Math.round(progress.progress)}%</text>
+          <text fg={t.fg.secondary}>[</text>
+          <text fg={t.status.success}>{"█".repeat(filled)}</text>
+          <text fg={t.fg.muted}>{"░".repeat(empty)}</text>
+          <text fg={t.fg.secondary}>]</text>
+          <text fg={t.fg.primary}> {Math.round(progress.progress)}%</text>
         </box>
-        <text fg="yellow" marginTop={1}>Current: {progress.message}</text>
+        <text fg={t.accent} marginTop={1}>Current: {progress.message}</text>
       </box>
     );
   };
@@ -180,17 +181,17 @@ export function DeployingView({ context }: Props) {
       <box
         flexDirection="column"
         borderStyle="double"
-        borderColor="yellow"
+        borderColor={t.status.warning}
         padding={1}
         marginBottom={1}
       >
-        <text fg="yellow">Confirmation Required</text>
+        <text fg={t.status.warning}>Confirmation Required</text>
         <box flexDirection="column" marginTop={1}>
           {lines.map((line, i) => (
-            <text key={i} fg="white">{line}</text>
+            <text key={i} fg={t.fg.primary}>{line}</text>
           ))}
         </box>
-        <text fg="yellow" marginTop={1}>Press Y for Yes, N for No</text>
+        <text fg={t.status.warning} marginTop={1}>Press Y for Yes, N for No</text>
       </box>
     );
   };
@@ -201,37 +202,37 @@ export function DeployingView({ context }: Props) {
         <box
           flexDirection="column"
           borderStyle="double"
-          borderColor="cyan"
+          borderColor={t.accent}
           padding={1}
           marginBottom={1}
         >
-          <text fg="cyan">Interactive Setup</text>
-          <text fg="white" marginTop={1}>A terminal window has been opened.</text>
+          <text fg={t.accent}>Interactive Setup</text>
+          <text fg={t.fg.primary} marginTop={1}>A terminal window has been opened.</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="yellow"
+          borderColor={t.border.default}
           padding={1}
           marginBottom={1}
         >
-          <text fg="yellow">Instructions:</text>
+          <text fg={t.status.warning}>Instructions:</text>
           <box flexDirection="column" marginTop={1}>
-            <text fg="white">1. Complete the setup in the terminal window</text>
-            <text fg="white">2. Follow the prompts shown in the terminal</text>
-            <text fg="white">3. When done, close the terminal window</text>
-            <text fg="white">4. Press Enter here to continue</text>
+            <text fg={t.fg.primary}>1. Complete the setup in the terminal window</text>
+            <text fg={t.fg.primary}>2. Follow the prompts shown in the terminal</text>
+            <text fg={t.fg.primary}>3. When done, close the terminal window</text>
+            <text fg={t.fg.primary}>4. Press Enter here to continue</text>
           </box>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="green"
+          borderColor={t.status.success}
           padding={1}
         >
-          <text fg="green">Press Enter when you have completed the setup in the terminal</text>
+          <text fg={t.status.success}>Press Enter when you have completed the setup in the terminal</text>
         </box>
       </box>
     );
@@ -245,42 +246,42 @@ export function DeployingView({ context }: Props) {
         <box
           flexDirection="column"
           borderStyle="double"
-          borderColor="green"
+          borderColor={t.status.success}
           padding={1}
           marginBottom={1}
         >
-          <text fg="green">Deployment Successful!</text>
-          <text fg="green" marginTop={1}>Your OpenClaw instance is now running.</text>
+          <text fg={t.status.success}>Deployment Successful!</text>
+          <text fg={t.status.success} marginTop={1}>Your OpenClaw instance is now running.</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="green"
+          borderColor={t.border.default}
           padding={1}
           marginBottom={1}
         >
-          <text fg="green">Connection Details</text>
+          <text fg={t.fg.primary}>Connection Details</text>
           <box flexDirection="row" marginTop={1}>
-            <text fg="white" width={15}>Server IP:</text>
-            <text fg="cyan">{state.serverIp || "N/A"}</text>
+            <text fg={t.fg.secondary} width={15}>Server IP:</text>
+            <text fg={t.accent}>{state.serverIp || "N/A"}</text>
           </box>
           <box flexDirection="row">
-            <text fg="white" width={15}>Tailscale IP:</text>
-            <text fg="cyan">{state.tailscaleIp || "N/A"}</text>
+            <text fg={t.fg.secondary} width={15}>Tailscale IP:</text>
+            <text fg={t.accent}>{state.tailscaleIp || "N/A"}</text>
           </box>
           <box flexDirection="row">
-            <text fg="white" width={15}>Gateway Port:</text>
-            <text fg="cyan">18789</text>
+            <text fg={t.fg.secondary} width={15}>Gateway Port:</text>
+            <text fg={t.accent}>18789</text>
           </box>
         </box>
 
-        <text fg="green">Next steps:</text>
-        <text fg="white">  /ssh  - Connect to your server</text>
-        <text fg="white">  /logs - View OpenClaw logs</text>
-        <text fg="white">  Gateway: http://{state.tailscaleIp || state.serverIp}:18789/</text>
+        <text fg={t.status.success}>Next steps:</text>
+        <text fg={t.fg.primary}>  /ssh  - Connect to your server</text>
+        <text fg={t.fg.primary}>  /logs - View OpenClaw logs</text>
+        <text fg={t.fg.primary}>  Gateway: http://{state.tailscaleIp || state.serverIp}:18789/</text>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   };
@@ -291,23 +292,23 @@ export function DeployingView({ context }: Props) {
         <box
           flexDirection="column"
           borderStyle="double"
-          borderColor="red"
+          borderColor={t.status.error}
           padding={1}
           marginBottom={1}
         >
-          <text fg="red">Deployment Failed</text>
-          <text fg="white" marginTop={1}>Something went wrong during deployment.</text>
-          <text fg="red" marginTop={1}>Error: {error}</text>
+          <text fg={t.status.error}>Deployment Failed</text>
+          <text fg={t.fg.primary} marginTop={1}>Something went wrong during deployment.</text>
+          <text fg={t.status.error} marginTop={1}>Error: {error}</text>
         </box>
 
         <box flexDirection="column" marginBottom={1}>
-          <text fg="white">What you can do:</text>
-          <text fg="gray">  1. Run /deploy again - it will resume from the last successful step</text>
-          <text fg="gray">  2. Run /status to check the current state of your deployment</text>
-          <text fg="gray">  3. Run /destroy and /new to start fresh if the issue persists</text>
+          <text fg={t.fg.primary}>What you can do:</text>
+          <text fg={t.fg.secondary}>  1. Run /deploy again - it will resume from the last successful step</text>
+          <text fg={t.fg.secondary}>  2. Run /status to check the current state of your deployment</text>
+          <text fg={t.fg.secondary}>  3. Run /destroy and /new to start fresh if the issue persists</text>
         </box>
 
-        <text fg="yellow" marginTop={1}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={1}>Press any key to return to home</text>
       </box>
     );
   };
@@ -316,7 +317,7 @@ export function DeployingView({ context }: Props) {
     <box flexDirection="column" width="100%" padding={1}>
       {/* Header */}
       <box flexDirection="row" marginBottom={2}>
-        <text fg="cyan">Deploying: {deploymentName}</text>
+        <text fg={t.accent}>Deploying: {deploymentName}</text>
       </box>
 
       {/* Progress */}
@@ -338,13 +339,13 @@ export function DeployingView({ context }: Props) {
       <box
         flexDirection="column"
         borderStyle="single"
-        borderColor="gray"
+        borderColor={t.border.default}
         padding={1}
       >
-        <text fg="gray">Deployment Log</text>
+        <text fg={t.fg.secondary}>Deployment Log</text>
         <box flexDirection="column" marginTop={1}>
           {logs.map((log, i) => (
-            <text key={i} fg="gray">{log}</text>
+            <text key={i} fg={t.fg.muted}>{log}</text>
           ))}
         </box>
       </box>

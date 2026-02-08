@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AppContext } from "../App.js";
 import type { ViewName } from "../types/index.js";
+import { t, statusColor } from "../theme.js";
 
 interface Props {
   context: AppContext;
@@ -64,7 +65,7 @@ export function Home({ context }: Props) {
           flexShrink: 1,
           width: "100%",
           height: "100%",
-          backgroundColor: "#1e293b"
+          backgroundColor: t.bg.base
         }}
         verticalScrollbarOptions={{
           showArrows: false,
@@ -73,38 +74,38 @@ export function Home({ context }: Props) {
         <box flexDirection="column" padding={1}>
           {/* Header */}
           <box flexDirection="column" marginBottom={1}>
-            <text fg="cyan">{LOGO}</text>
-            <text fg="gray">Deploy and manage OpenClaw instances with ease</text>
+            <text fg={t.accent}>{LOGO}</text>
+            <text fg={t.fg.secondary}>Deploy and manage OpenClaw instances with ease</text>
           </box>
 
           {/* Quick Start */}
           <box
             flexDirection="column"
             borderStyle="single"
-            borderColor="blue"
+            borderColor={t.border.focus}
             padding={1}
             marginBottom={1}
           >
-            <text fg="cyan">Quick Start</text>
-            <text fg="white" marginTop={1}>1. Type /new to initialize a new deployment</text>
-            <text fg="white">2. Type /deploy to deploy your configuration</text>
-            <text fg="white">3. Type /status to monitor your deployments</text>
+            <text fg={t.accent}>Quick Start</text>
+            <text fg={t.fg.primary} marginTop={1}>1. Type /new to initialize a new deployment</text>
+            <text fg={t.fg.primary}>2. Type /deploy to deploy your configuration</text>
+            <text fg={t.fg.primary}>3. Type /status to monitor your deployments</text>
           </box>
 
           {/* Available Commands */}
           <box
             flexDirection="column"
             borderStyle="single"
-            borderColor="gray"
+            borderColor={t.border.default}
             padding={1}
             marginBottom={1}
           >
-            <text fg="white">Available Commands</text>
+            <text fg={t.fg.primary}>Available Commands</text>
             <box flexDirection="column" marginTop={1}>
               {COMMANDS.map((cmd) => (
                 <box key={cmd.name} flexDirection="row">
-                  <text fg="yellow" width={12}>{cmd.name}</text>
-                  <text fg="gray">{cmd.description}</text>
+                  <text fg={t.accent} width={12}>{cmd.name}</text>
+                  <text fg={t.fg.secondary}>{cmd.description}</text>
                 </box>
               ))}
             </box>
@@ -115,24 +116,16 @@ export function Home({ context }: Props) {
             <box
               flexDirection="column"
               borderStyle="single"
-              borderColor="green"
+              borderColor={t.border.default}
               padding={1}
               marginBottom={1}
             >
-              <text fg="green">Your Deployments ({context.deployments.length})</text>
+              <text fg={t.fg.primary}>Your Deployments ({context.deployments.length})</text>
               <box flexDirection="column" marginTop={1}>
                 {context.deployments.map((deployment) => (
                   <box key={deployment.config.name} flexDirection="row">
-                    <text fg="white" width={20}>{deployment.config.name}</text>
-                    <text
-                      fg={
-                        deployment.state.status === "deployed"
-                          ? "green"
-                          : deployment.state.status === "failed"
-                            ? "red"
-                            : "yellow"
-                      }
-                    >
+                    <text fg={t.fg.primary} width={20}>{deployment.config.name}</text>
+                    <text fg={statusColor(deployment.state.status)}>
                       {deployment.state.status}
                     </text>
                   </box>
@@ -147,20 +140,12 @@ export function Home({ context }: Props) {
       <box flexDirection="column" paddingLeft={0} paddingRight={0} paddingTop={0}>
         {error && (
           <box marginBottom={0}>
-            <text fg="red">{error}</text>
+            <text fg={t.status.error}>{error}</text>
           </box>
         )}
-        {/* <text fg="cyan" marginBottom={0.5}>{"> Enter command:"}</text> */}
         <box
-          // borderStyle="single"
-          // borderColor="gray"
-          backgroundColor="#16181D"
-          marginTop={1}
+          backgroundColor={t.bg.elevated}
           paddingTop={1}
-        // paddingTop={0}
-        // paddingBottom={1.1}
-        // paddingLeft={2}
-        // paddingRight={2}
         >
           <box width="100%" paddingTop={0}
             paddingBottom={1.3} paddingLeft={1}>

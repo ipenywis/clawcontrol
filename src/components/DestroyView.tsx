@@ -3,6 +3,7 @@ import { useKeyboard } from "@opentui/react";
 import type { AppContext } from "../App.js";
 import { deleteDeployment } from "../services/config.js";
 import { createHetznerClient } from "../providers/hetzner/api.js";
+import { t } from "../theme.js";
 
 interface Props {
   context: AppContext;
@@ -92,20 +93,20 @@ export function DestroyView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="red">/destroy</text>
-          <text fg="gray"> - Destroy deployment</text>
+          <text fg={t.status.error}>/destroy</text>
+          <text fg={t.fg.secondary}> - Destroy deployment</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="yellow"
+          borderColor={t.border.default}
           padding={1}
         >
-          <text fg="yellow">No deployments found!</text>
+          <text fg={t.status.warning}>No deployments found!</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }
@@ -114,17 +115,17 @@ export function DestroyView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="red">/destroy</text>
-          <text fg="gray"> - Select a deployment to destroy</text>
+          <text fg={t.status.error}>/destroy</text>
+          <text fg={t.fg.secondary}> - Select a deployment to destroy</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="red"
+          borderColor={t.status.error}
           padding={1}
         >
-          <text fg="red" marginBottom={1}>WARNING: This action cannot be undone!</text>
+          <text fg={t.status.error} marginBottom={1}>WARNING: This action cannot be undone!</text>
           {deployments.map((deployment, index) => {
             const isSelected = index === selectedIndex;
 
@@ -132,15 +133,15 @@ export function DestroyView({ context }: Props) {
               <box
                 key={deployment.config.name}
                 flexDirection="row"
-                backgroundColor={isSelected ? "red" : undefined}
+                backgroundColor={isSelected ? t.selection.bg : undefined}
               >
-                <text fg={isSelected ? "white" : "gray"}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary}>
                   {isSelected ? "> " : "  "}
                 </text>
-                <text fg={isSelected ? "white" : "gray"} width={25}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary} width={25}>
                   {deployment.config.name}
                 </text>
-                <text fg={isSelected ? "white" : "gray"}>
+                <text fg={isSelected ? t.selection.fg : t.fg.secondary}>
                   [{deployment.state.status}]
                 </text>
               </box>
@@ -148,7 +149,7 @@ export function DestroyView({ context }: Props) {
           })}
         </box>
 
-        <text fg="gray" marginTop={2}>Arrow keys to select | Enter to destroy | Esc to go back</text>
+        <text fg={t.fg.muted} marginTop={2}>Arrow keys to select | Enter to destroy | Esc to go back</text>
       </box>
     );
   }
@@ -157,29 +158,29 @@ export function DestroyView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="red">Confirm Destruction</text>
+          <text fg={t.status.error}>Confirm Destruction</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="double"
-          borderColor="red"
+          borderColor={t.status.error}
           padding={1}
         >
-          <text fg="red">You are about to destroy:</text>
-          <text fg="white" marginTop={1}>Deployment: {selectedDeployment.config.name}</text>
+          <text fg={t.status.error}>You are about to destroy:</text>
+          <text fg={t.fg.primary} marginTop={1}>Deployment: {selectedDeployment.config.name}</text>
           {selectedDeployment.state.serverIp && (
-            <text fg="white">Server IP: {selectedDeployment.state.serverIp}</text>
+            <text fg={t.fg.primary}>Server IP: {selectedDeployment.state.serverIp}</text>
           )}
-          <text fg="red" marginTop={1}>This will permanently delete:</text>
-          <text fg="gray">• The VPS server (if deployed)</text>
-          <text fg="gray">• All data on the server</text>
-          <text fg="gray">• Local configuration files</text>
-          <text fg="gray">• SSH keys</text>
+          <text fg={t.status.error} marginTop={1}>This will permanently delete:</text>
+          <text fg={t.fg.secondary}>• The VPS server (if deployed)</text>
+          <text fg={t.fg.secondary}>• All data on the server</text>
+          <text fg={t.fg.secondary}>• Local configuration files</text>
+          <text fg={t.fg.secondary}>• SSH keys</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Type the deployment name to confirm:</text>
-        <text fg="white" marginTop={1}>Confirm:</text>
+        <text fg={t.status.warning} marginTop={2}>Type the deployment name to confirm:</text>
+        <text fg={t.fg.primary} marginTop={1}>Confirm:</text>
         <input
           value={confirmText}
           placeholder={selectedDeployment.config.name}
@@ -201,9 +202,9 @@ export function DestroyView({ context }: Props) {
           }}
         />
 
-        {error && <text fg="red" marginTop={1}>{error}</text>}
+        {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
 
-        <text fg="gray" marginTop={2}>Press Esc to cancel</text>
+        <text fg={t.fg.muted} marginTop={2}>Press Esc to cancel</text>
       </box>
     );
   }
@@ -211,8 +212,8 @@ export function DestroyView({ context }: Props) {
   if (viewState === "destroying") {
     return (
       <box flexDirection="column" width="100%" padding={1}>
-        <text fg="red">Destroying deployment...</text>
-        <text fg="yellow" marginTop={1}>Deleting server and cleaning up resources...</text>
+        <text fg={t.status.error}>Destroying deployment...</text>
+        <text fg={t.fg.secondary} marginTop={1}>Deleting server and cleaning up resources...</text>
       </box>
     );
   }
@@ -223,16 +224,16 @@ export function DestroyView({ context }: Props) {
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="green"
+          borderColor={t.status.success}
           padding={1}
         >
-          <text fg="green">Deployment Destroyed</text>
-          <text fg="white" marginTop={1}>
+          <text fg={t.status.success}>Deployment Destroyed</text>
+          <text fg={t.fg.primary} marginTop={1}>
             The deployment "{selectedDeployment.config.name}" has been permanently deleted.
           </text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }
@@ -243,14 +244,14 @@ export function DestroyView({ context }: Props) {
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="red"
+          borderColor={t.status.error}
           padding={1}
         >
-          <text fg="red">Destruction Failed</text>
-          <text fg="white" marginTop={1}>{error}</text>
+          <text fg={t.status.error}>Destruction Failed</text>
+          <text fg={t.fg.primary} marginTop={1}>{error}</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to go back</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to go back</text>
       </box>
     );
   }

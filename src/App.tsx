@@ -11,6 +11,7 @@ import { LogsView } from "./components/LogsView.js";
 import { DestroyView } from "./components/DestroyView.js";
 import { HelpView } from "./components/HelpView.js";
 import { getAllDeployments } from "./services/config.js";
+import { t } from "./theme.js";
 
 export interface AppContext {
   navigateTo: (view: ViewName, deployment?: string) => void;
@@ -113,7 +114,7 @@ export function App() {
         flexShrink: 1,
         width: "100%",
         height: "100%",
-        backgroundColor: "#1e293b"
+        backgroundColor: t.bg.base
       }}
       verticalScrollbarOptions={{
         showArrows: false,

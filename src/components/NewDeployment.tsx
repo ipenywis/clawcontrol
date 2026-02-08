@@ -11,6 +11,7 @@ import {
 } from "../services/config.js";
 import { createHetznerClient } from "../providers/hetzner/api.js";
 import { SUPPORTED_PROVIDERS, PROVIDER_NAMES } from "../providers/index.js";
+import { t } from "../theme.js";
 
 // Debug logging to file
 const DEBUG_FILE = join(homedir(), ".clawcontrol", "debug.log");
@@ -302,11 +303,11 @@ export function NewDeployment({ context }: Props) {
       case "name":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 1: Deployment Name</text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.accent}>Step 1: Deployment Name</text>
+            <text fg={t.fg.secondary} marginTop={1}>
               Enter a unique name for this deployment (lowercase, alphanumeric, hyphens allowed):
             </text>
-            <text fg="white" marginTop={1}>Name:</text>
+            <text fg={t.fg.primary} marginTop={1}>Name:</text>
             <input
               value={name}
               placeholder="my-openclaw-server"
@@ -323,20 +324,20 @@ export function NewDeployment({ context }: Props) {
                 }
               }}
             />
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="gray" marginTop={2}>Press Enter to continue, or Esc to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, or Esc to go back</text>
           </box>
         );
 
       case "provider":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 2: Cloud Provider</text>
-            <text fg="gray" marginTop={1}>Select where to deploy (use arrow keys and Enter):</text>
+            <text fg={t.accent}>Step 2: Cloud Provider</text>
+            <text fg={t.fg.secondary} marginTop={1}>Select where to deploy (use arrow keys and Enter):</text>
             <box
               flexDirection="column"
               borderStyle="single"
-              borderColor="gray"
+              borderColor={t.border.default}
               marginTop={1}
               padding={1}
             >
@@ -344,27 +345,27 @@ export function NewDeployment({ context }: Props) {
                 const isSelected = i === selectedProviderIndex;
                 const desc = p !== "hetzner" ? "Coming soon" : "Recommended - US East";
                 return (
-                  <box key={p} flexDirection="row" backgroundColor={isSelected ? "#334155" : undefined}>
-                    <text fg={isSelected ? "cyan" : "white"}>{isSelected ? "❯ " : "  "}</text>
-                    <text fg={isSelected ? "cyan" : "white"}>{PROVIDER_NAMES[p]}</text>
-                    <text fg={isSelected ? "white" : "gray"}>{" - " + desc}</text>
+                  <box key={p} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>{isSelected ? "❯ " : "  "}</text>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>{PROVIDER_NAMES[p]}</text>
+                    <text fg={isSelected ? t.fg.primary : t.fg.secondary}>{" - " + desc}</text>
                   </box>
                 );
               })}
             </box>
-            <text fg="gray" marginTop={1}>Press Enter to select, Esc to go back</text>
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
           </box>
         );
 
       case "api_key":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 3: Hetzner API Key</text>
-            <text fg="gray" marginTop={1}>Enter your Hetzner Cloud API token.</text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.accent}>Step 3: Hetzner API Key</text>
+            <text fg={t.fg.secondary} marginTop={1}>Enter your Hetzner Cloud API token.</text>
+            <text fg={t.fg.secondary} marginTop={1}>
               Get one at: https://docs.hetzner.com/cloud/api/getting-started/generating-api-token
             </text>
-            <text fg="white" marginTop={2}>API Key:</text>
+            <text fg={t.fg.primary} marginTop={2}>API Key:</text>
             <input
               value={apiKey}
               placeholder="Enter your Hetzner API key..."
@@ -386,47 +387,47 @@ export function NewDeployment({ context }: Props) {
                 }
               }}
             />
-            {isValidating && <text fg="yellow" marginTop={1}>Validating API key...</text>}
-            {error && <text fg="red" marginTop={1}>{error}</text>}
+            {isValidating && <text fg={t.status.warning} marginTop={1}>Validating API key...</text>}
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
           </box>
         );
 
       case "ai_provider":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 4: AI Provider</text>
-            <text fg="gray" marginTop={1}>Select your AI model provider (use arrow keys and Enter):</text>
+            <text fg={t.accent}>Step 4: AI Provider</text>
+            <text fg={t.fg.secondary} marginTop={1}>Select your AI model provider (use arrow keys and Enter):</text>
             <box
               flexDirection="column"
               borderStyle="single"
-              borderColor="gray"
+              borderColor={t.border.default}
               marginTop={1}
               padding={1}
             >
               {AI_PROVIDERS.map((p, i) => {
                 const isSelected = i === selectedAiProviderIndex;
                 return (
-                  <box key={p.name} flexDirection="row" backgroundColor={isSelected ? "#334155" : undefined}>
-                    <text fg={isSelected ? "cyan" : "white"}>{isSelected ? "❯ " : "  "}</text>
-                    <text fg={isSelected ? "cyan" : "white"}>{p.label}</text>
-                    <text fg={isSelected ? "white" : "gray"}>{" - " + p.description}</text>
+                  <box key={p.name} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>{isSelected ? "❯ " : "  "}</text>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>{p.label}</text>
+                    <text fg={isSelected ? t.fg.primary : t.fg.secondary}>{" - " + p.description}</text>
                   </box>
                 );
               })}
             </box>
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="gray" marginTop={1}>Press Enter to select, Esc to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
           </box>
         );
 
       case "ai_api_key":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 5: AI Provider API Key</text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.accent}>Step 5: AI Provider API Key</text>
+            <text fg={t.fg.secondary} marginTop={1}>
               Enter your {aiProvider || "AI provider"} API key ({getAiProviderHint()}).
             </text>
-            <text fg="white" marginTop={2}>{getAiProviderHint()}:</text>
+            <text fg={t.fg.primary} marginTop={2}>{getAiProviderHint()}:</text>
             <input
               value={aiApiKey}
               placeholder={`Enter your ${aiProvider || "AI provider"} API key...`}
@@ -443,22 +444,22 @@ export function NewDeployment({ context }: Props) {
                 }
               }}
             />
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="gray" marginTop={2}>Press Enter to continue, Esc to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
           </box>
         );
 
       case "model":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 6: Default Model</text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.accent}>Step 6: Default Model</text>
+            <text fg={t.fg.secondary} marginTop={1}>
               Enter the model identifier for {aiProvider || "your AI provider"}.
             </text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.fg.secondary} marginTop={1}>
               {getModelHint()}
             </text>
-            <text fg="white" marginTop={2}>Model:</text>
+            <text fg={t.fg.primary} marginTop={2}>Model:</text>
             <input
               value={model}
               placeholder="claude-sonnet-4-20250514"
@@ -475,22 +476,22 @@ export function NewDeployment({ context }: Props) {
                 }
               }}
             />
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="gray" marginTop={2}>Press Enter to continue, Esc to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
           </box>
         );
 
       case "telegram_bot_token":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 7: Telegram Bot Token</text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.accent}>Step 7: Telegram Bot Token</text>
+            <text fg={t.fg.secondary} marginTop={1}>
               Enter your Telegram bot token. Create one via @BotFather on Telegram.
             </text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.fg.secondary} marginTop={1}>
               Open Telegram, search for @BotFather, send /newbot and follow the steps.
             </text>
-            <text fg="white" marginTop={2}>Bot Token:</text>
+            <text fg={t.fg.primary} marginTop={2}>Bot Token:</text>
             <input
               value={telegramBotToken}
               placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz..."
@@ -507,28 +508,28 @@ export function NewDeployment({ context }: Props) {
                 }
               }}
             />
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="gray" marginTop={2}>Press Enter to continue, Esc to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
           </box>
         );
 
       case "telegram_allow_from":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 8: Telegram Access Control</text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.accent}>Step 8: Telegram Access Control</text>
+            <text fg={t.fg.secondary} marginTop={1}>
               Enter your Telegram user ID or @username to restrict bot access.
             </text>
-            <text fg="gray">
+            <text fg={t.fg.secondary}>
               Only messages from this user will be processed by the agent.
             </text>
-            <text fg="gray" marginTop={1}>
+            <text fg={t.fg.secondary} marginTop={1}>
               Find your user ID: https://docs.openclaw.ai/channels/telegram#finding-your-telegram-user-id
             </text>
-            <text fg="gray">
+            <text fg={t.fg.secondary}>
               Learn more: https://docs.openclaw.ai/channels/telegram#access-control-dms-+-groups
             </text>
-            <text fg="white" marginTop={2}>User ID or @username:</text>
+            <text fg={t.fg.primary} marginTop={2}>User ID or @username:</text>
             <input
               value={telegramAllowFrom}
               placeholder="123456789 or @yourusername"
@@ -545,96 +546,96 @@ export function NewDeployment({ context }: Props) {
                 }
               }}
             />
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="gray" marginTop={2}>Press Enter to continue, Esc to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
           </box>
         );
 
       case "confirm":
         return (
           <box flexDirection="column">
-            <text fg="cyan">Step 9: Confirm Configuration</text>
+            <text fg={t.accent}>Step 9: Confirm Configuration</text>
             <box
               flexDirection="column"
               borderStyle="single"
-              borderColor="gray"
+              borderColor={t.border.default}
               padding={1}
               marginTop={1}
             >
               <box flexDirection="row">
-                <text fg="gray" width={20}>Name:</text>
-                <text fg="white">{name}</text>
+                <text fg={t.fg.secondary} width={20}>Name:</text>
+                <text fg={t.fg.primary}>{name}</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Cloud Provider:</text>
-                <text fg="white">{PROVIDER_NAMES[provider]}</text>
+                <text fg={t.fg.secondary} width={20}>Cloud Provider:</text>
+                <text fg={t.fg.primary}>{PROVIDER_NAMES[provider]}</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Server Type:</text>
-                <text fg="white">CPX11 (2 vCPU, 2GB RAM, 40GB SSD)</text>
+                <text fg={t.fg.secondary} width={20}>Server Type:</text>
+                <text fg={t.fg.primary}>CPX11 (2 vCPU, 2GB RAM, 40GB SSD)</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Location:</text>
-                <text fg="white">Ashburn, VA (US East)</text>
+                <text fg={t.fg.secondary} width={20}>Location:</text>
+                <text fg={t.fg.primary}>Ashburn, VA (US East)</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>OS:</text>
-                <text fg="white">Ubuntu 24.04 LTS</text>
+                <text fg={t.fg.secondary} width={20}>OS:</text>
+                <text fg={t.fg.primary}>Ubuntu 24.04 LTS</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>AI Provider:</text>
-                <text fg="white">{aiProvider}</text>
+                <text fg={t.fg.secondary} width={20}>AI Provider:</text>
+                <text fg={t.fg.primary}>{aiProvider}</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>AI API Key:</text>
-                <text fg="white">{aiApiKey ? `${aiApiKey.substring(0, 8)}...` : "N/A"}</text>
+                <text fg={t.fg.secondary} width={20}>AI API Key:</text>
+                <text fg={t.fg.primary}>{aiApiKey ? `${aiApiKey.substring(0, 8)}...` : "N/A"}</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Model:</text>
-                <text fg="white">{model}</text>
+                <text fg={t.fg.secondary} width={20}>Model:</text>
+                <text fg={t.fg.primary}>{model}</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Channel:</text>
-                <text fg="white">Telegram</text>
+                <text fg={t.fg.secondary} width={20}>Channel:</text>
+                <text fg={t.fg.primary}>Telegram</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Bot Token:</text>
-                <text fg="white">{telegramBotToken ? `${telegramBotToken.substring(0, 12)}...` : "N/A"}</text>
+                <text fg={t.fg.secondary} width={20}>Bot Token:</text>
+                <text fg={t.fg.primary}>{telegramBotToken ? `${telegramBotToken.substring(0, 12)}...` : "N/A"}</text>
               </box>
               <box flexDirection="row">
-                <text fg="gray" width={20}>Allow From:</text>
-                <text fg="white">{telegramAllowFrom || "N/A"}</text>
+                <text fg={t.fg.secondary} width={20}>Allow From:</text>
+                <text fg={t.fg.primary}>{telegramAllowFrom || "N/A"}</text>
               </box>
             </box>
-            {error && <text fg="red" marginTop={1}>{error}</text>}
-            <text fg="yellow" marginTop={2}>Press Y to confirm, N to go back</text>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.status.warning} marginTop={2}>Press Y to confirm, N to go back</text>
           </box>
         );
 
       case "complete":
         return (
           <box flexDirection="column">
-            <text fg="green">Deployment Configuration Created!</text>
+            <text fg={t.status.success}>Deployment Configuration Created!</text>
             <box
               flexDirection="column"
               borderStyle="single"
-              borderColor="green"
+              borderColor={t.border.default}
               padding={1}
               marginTop={1}
             >
-              <text fg="white">Your deployment "{name}" has been initialized.</text>
-              <text fg="gray" marginTop={1}>
+              <text fg={t.fg.primary}>Your deployment "{name}" has been initialized.</text>
+              <text fg={t.fg.secondary} marginTop={1}>
                 Configuration saved to: ~/.clawcontrol/deployments/{name}/
               </text>
-              <text fg="gray" marginTop={1}>
+              <text fg={t.fg.secondary} marginTop={1}>
                 AI: {aiProvider} / {model}
               </text>
-              <text fg="gray">
+              <text fg={t.fg.secondary}>
                 Channel: Telegram (allowed: {telegramAllowFrom})
               </text>
             </box>
-            <text fg="cyan" marginTop={2}>Next step: Run /deploy to deploy this configuration</text>
-            <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+            <text fg={t.accent} marginTop={2}>Next step: Run /deploy to deploy this configuration</text>
+            <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
           </box>
         );
     }
@@ -644,19 +645,19 @@ export function NewDeployment({ context }: Props) {
     <box flexDirection="column" width="100%" padding={1}>
       {/* Header */}
       <box flexDirection="row" marginBottom={2}>
-        <text fg="cyan">/new</text>
-        <text fg="gray"> - Initialize a new deployment</text>
+        <text fg={t.accent}>/new</text>
+        <text fg={t.fg.secondary}> - Initialize a new deployment</text>
       </box>
 
       {/* Progress indicator */}
       <box flexDirection="row" marginBottom={2}>
         {STEP_LIST.map((s, i) => {
           const currentIdx = STEP_LIST.indexOf(step);
-          const stepColor = step === s ? "cyan" : currentIdx > i ? "green" : "gray";
+          const stepColor = step === s ? t.accent : currentIdx > i ? t.status.success : t.fg.muted;
           return (
             <box key={s} flexDirection="row">
               <text fg={stepColor}>{i + 1}</text>
-              {i < STEP_LIST.length - 1 && <text fg="gray"> → </text>}
+              {i < STEP_LIST.length - 1 && <text fg={t.fg.muted}> → </text>}
             </box>
           );
         })}

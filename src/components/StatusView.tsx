@@ -4,6 +4,7 @@ import type { AppContext } from "../App.js";
 import type { Deployment } from "../types/index.js";
 import { connectToDeployment } from "../services/ssh.js";
 import { isOpenClawRunning } from "../services/setup/index.js";
+import { t, statusColor } from "../theme.js";
 
 interface Props {
   context: AppContext;
@@ -75,21 +76,21 @@ export function StatusView({ context }: Props) {
     return (
       <box flexDirection="column" width="100%" padding={1}>
         <box flexDirection="row" marginBottom={2}>
-          <text fg="cyan">/status</text>
-          <text fg="gray"> - Deployment Status</text>
+          <text fg={t.accent}>/status</text>
+          <text fg={t.fg.secondary}> - Deployment Status</text>
         </box>
 
         <box
           flexDirection="column"
           borderStyle="single"
-          borderColor="yellow"
+          borderColor={t.border.default}
           padding={1}
         >
-          <text fg="yellow">No deployments found!</text>
-          <text fg="gray" marginTop={1}>Run /new to create a deployment.</text>
+          <text fg={t.status.warning}>No deployments found!</text>
+          <text fg={t.fg.secondary} marginTop={1}>Run /new to create a deployment.</text>
         </box>
 
-        <text fg="yellow" marginTop={2}>Press any key to return to home</text>
+        <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
       </box>
     );
   }
@@ -100,44 +101,35 @@ export function StatusView({ context }: Props) {
   return (
     <box flexDirection="column" width="100%" padding={1}>
       <box flexDirection="row" marginBottom={2}>
-        <text fg="cyan">/status</text>
-        <text fg="gray"> - Deployment Status</text>
+        <text fg={t.accent}>/status</text>
+        <text fg={t.fg.secondary}> - Deployment Status</text>
       </box>
 
       {/* Deployment List */}
       <box
         flexDirection="column"
         borderStyle="single"
-        borderColor="gray"
+        borderColor={t.border.default}
         padding={1}
         marginBottom={1}
       >
-        <text fg="white" marginBottom={1}>Deployments ({deployments.length})</text>
+        <text fg={t.fg.primary} marginBottom={1}>Deployments ({deployments.length})</text>
         {deployments.map((deployment, index) => {
           const isSelected = index === selectedIndex;
-          const status = deployment.state.status;
-          const statusColor =
-            status === "deployed"
-              ? "green"
-              : status === "failed"
-              ? "red"
-              : status === "initialized"
-              ? "yellow"
-              : "cyan";
 
           return (
             <box
               key={deployment.config.name}
               flexDirection="row"
-              backgroundColor={isSelected ? "blue" : undefined}
+              backgroundColor={isSelected ? t.selection.bg : undefined}
             >
-              <text fg={isSelected ? "white" : "gray"}>
+              <text fg={isSelected ? t.selection.fg : t.fg.secondary}>
                 {isSelected ? "> " : "  "}
               </text>
-              <text fg={isSelected ? "white" : "gray"} width={25}>
+              <text fg={isSelected ? t.selection.fg : t.fg.secondary} width={25}>
                 {deployment.config.name}
               </text>
-              <text fg={statusColor}>[{status}]</text>
+              <text fg={statusColor(deployment.state.status)}>[{deployment.state.status}]</text>
             </box>
           );
         })}
@@ -147,95 +139,87 @@ export function StatusView({ context }: Props) {
       <box
         flexDirection="column"
         borderStyle="single"
-        borderColor="cyan"
+        borderColor={t.border.focus}
         padding={1}
         marginBottom={1}
       >
-        <text fg="cyan">Details: {selectedDeployment.config.name}</text>
+        <text fg={t.accent}>Details: {selectedDeployment.config.name}</text>
 
         <box flexDirection="row" marginTop={1}>
-          <text fg="gray" width={18}>Status:</text>
-          <text
-            fg={
-              selectedDeployment.state.status === "deployed"
-                ? "green"
-                : selectedDeployment.state.status === "failed"
-                ? "red"
-                : "yellow"
-            }
-          >
+          <text fg={t.fg.secondary} width={18}>Status:</text>
+          <text fg={statusColor(selectedDeployment.state.status)}>
             {selectedDeployment.state.status}
           </text>
         </box>
 
         <box flexDirection="row">
-          <text fg="gray" width={18}>Provider:</text>
-          <text fg="white">{selectedDeployment.config.provider}</text>
+          <text fg={t.fg.secondary} width={18}>Provider:</text>
+          <text fg={t.fg.primary}>{selectedDeployment.config.provider}</text>
         </box>
 
         <box flexDirection="row">
-          <text fg="gray" width={18}>Server IP:</text>
-          <text fg="cyan">{selectedDeployment.state.serverIp || "Not deployed"}</text>
+          <text fg={t.fg.secondary} width={18}>Server IP:</text>
+          <text fg={t.accent}>{selectedDeployment.state.serverIp || "Not deployed"}</text>
         </box>
 
         <box flexDirection="row">
-          <text fg="gray" width={18}>Tailscale IP:</text>
-          <text fg="cyan">{selectedDeployment.state.tailscaleIp || "Not configured"}</text>
+          <text fg={t.fg.secondary} width={18}>Tailscale IP:</text>
+          <text fg={t.accent}>{selectedDeployment.state.tailscaleIp || "Not configured"}</text>
         </box>
 
         <box flexDirection="row">
-          <text fg="gray" width={18}>Created:</text>
-          <text fg="white">{new Date(selectedDeployment.config.createdAt).toLocaleString()}</text>
+          <text fg={t.fg.secondary} width={18}>Created:</text>
+          <text fg={t.fg.primary}>{new Date(selectedDeployment.config.createdAt).toLocaleString()}</text>
         </box>
 
         {selectedDeployment.state.deployedAt && (
           <box flexDirection="row">
-            <text fg="gray" width={18}>Deployed:</text>
-            <text fg="white">{new Date(selectedDeployment.state.deployedAt).toLocaleString()}</text>
+            <text fg={t.fg.secondary} width={18}>Deployed:</text>
+            <text fg={t.fg.primary}>{new Date(selectedDeployment.state.deployedAt).toLocaleString()}</text>
           </box>
         )}
 
         {selectedDeployment.state.lastError && (
           <box flexDirection="row">
-            <text fg="gray" width={18}>Last Error:</text>
-            <text fg="red">{selectedDeployment.state.lastError}</text>
+            <text fg={t.fg.secondary} width={18}>Last Error:</text>
+            <text fg={t.status.error}>{selectedDeployment.state.lastError}</text>
           </box>
         )}
 
         {/* Health Status */}
         {selectedHealth && (
           <box flexDirection="column" marginTop={1}>
-            <text fg="white">Health Check:</text>
+            <text fg={t.fg.primary}>Health Check:</text>
             <box flexDirection="row">
-              <text fg="gray" width={18}>SSH:</text>
-              <text fg={selectedHealth.sshConnectable ? "green" : "red"}>
+              <text fg={t.fg.secondary} width={18}>SSH:</text>
+              <text fg={selectedHealth.sshConnectable ? t.status.success : t.status.error}>
                 {selectedHealth.sshConnectable ? "Connected" : "Unreachable"}
               </text>
             </box>
             <box flexDirection="row">
-              <text fg="gray" width={18}>OpenClaw:</text>
-              <text fg={selectedHealth.openclawRunning ? "green" : "red"}>
+              <text fg={t.fg.secondary} width={18}>OpenClaw:</text>
+              <text fg={selectedHealth.openclawRunning ? t.status.success : t.status.error}>
                 {selectedHealth.openclawRunning ? "Running" : "Not running"}
               </text>
             </box>
-            <text fg="gray">Last checked: {selectedHealth.lastChecked.toLocaleTimeString()}</text>
+            <text fg={t.fg.muted}>Last checked: {selectedHealth.lastChecked.toLocaleTimeString()}</text>
           </box>
         )}
 
         {checking === selectedDeployment.config.name && (
-          <text fg="yellow" marginTop={1}>Checking health...</text>
+          <text fg={t.status.warning} marginTop={1}>Checking health...</text>
         )}
       </box>
 
       {/* Checkpoints - show summary instead of full list */}
       {selectedDeployment.state.checkpoints.length > 0 && (
         <box flexDirection="row" marginBottom={1}>
-          <text fg="gray">Checkpoints: </text>
-          <text fg="green">{selectedDeployment.state.checkpoints.length} completed</text>
+          <text fg={t.fg.secondary}>Checkpoints: </text>
+          <text fg={t.status.success}>{selectedDeployment.state.checkpoints.length} completed</text>
         </box>
       )}
 
-      <text fg="gray">Up/Down: Select | Enter: Health check | Esc: Back</text>
+      <text fg={t.fg.muted}>Up/Down: Select | Enter: Health check | Esc: Back</text>
     </box>
   );
 }
