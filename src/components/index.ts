@@ -1,5 +1,6 @@
 export { Home } from "./Home.js";
 export { NewDeployment } from "./NewDeployment.js";
+export { ListView } from "./ListView.js";
 export { DeployView } from "./DeployView.js";
 export { DeployingView } from "./DeployingView.js";
 export { StatusView } from "./StatusView.js";

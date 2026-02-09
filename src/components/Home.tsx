@@ -18,6 +18,7 @@ const LOGO = `
 
 const COMMANDS = [
   { name: "/new", description: "Initialize a new deployment" },
+  { name: "/list", description: "List, edit, or fork deployments" },
   { name: "/deploy", description: "Deploy an initialized configuration" },
   { name: "/status", description: "View deployment status" },
   { name: "/ssh", description: "SSH into a deployment" },
@@ -37,6 +38,7 @@ export function Home({ context }: Props) {
 
     const viewMap: Record<string, ViewName> = {
       "/new": "new",
+      "/list": "list",
       "/deploy": "deploy",
       "/status": "status",
       "/ssh": "ssh",

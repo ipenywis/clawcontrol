@@ -1,6 +1,6 @@
 {
   "name": "clawcontrol",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "CLI tool for deploying and managing OpenClaw instances on VPS providers",
   "type": "module",
   "main": "dist/index.js",

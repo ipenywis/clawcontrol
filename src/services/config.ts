@@ -210,6 +210,18 @@ export function deleteDeployment(name: string): void {
 }
 
 /**
+ * Updates an existing deployment's configuration (preserves state.json)
+ */
+export function updateDeploymentConfig(name: string, config: DeploymentConfig): void {
+  const configPath = getConfigPath(name);
+  if (!existsSync(configPath)) {
+    throw new Error(`Deployment "${name}" not found`);
+  }
+  const validated = DeploymentConfigSchema.parse(config);
+  writeFileSync(configPath, JSON.stringify(validated, null, 2));
+}
+
+/**
  * Validates a deployment name
  */
 export function validateDeploymentName(name: string): { valid: boolean; error?: string } {

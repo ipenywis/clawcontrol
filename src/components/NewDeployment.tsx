@@ -7,6 +7,7 @@ import type { AppContext } from "../App.js";
 import type { Provider, DeploymentConfig, Template, SavedSecret } from "../types/index.js";
 import {
   createDeployment,
+  updateDeploymentConfig,
   validateDeploymentName,
 } from "../services/config.js";
 import { getAllTemplates } from "../services/templates.js";
@@ -67,7 +68,27 @@ const DO_DROPLET_SIZES = [
   { slug: "s-8vcpu-16gb", label: "8 vCPU, 16GB RAM, 320GB SSD", price: "$96/mo" },
 ];
 
-function getStepList(provider: Provider, activeTemplate: Template | null): Step[] {
+function getStepList(provider: Provider, activeTemplate: Template | null, editMode?: "edit" | "fork"): Step[] {
+  if (editMode === "edit") {
+    // Edit mode: skip template_choice, name, provider, ai_provider
+    const steps: Step[] = ["api_key_choose"];
+    if (provider === "digitalocean") {
+      steps.push("droplet_size");
+    }
+    steps.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
+    return steps;
+  }
+
+  if (editMode === "fork") {
+    // Fork mode: skip template_choice, provider, ai_provider
+    const steps: Step[] = ["name", "api_key_choose"];
+    if (provider === "digitalocean") {
+      steps.push("droplet_size");
+    }
+    steps.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
+    return steps;
+  }
+
   const base: Step[] = ["template_choice"];
 
   if (!activeTemplate) {
@@ -112,22 +133,43 @@ function resolveStepForProgress(s: Step): Step {
 }
 
 export function NewDeployment({ context }: Props) {
+  // Edit/fork state
+  const [editingConfig, setEditingConfig] = useState<DeploymentConfig | null>(null);
+  const [editMode, setEditMode] = useState<"edit" | "fork" | null>(null);
+
   // Template state
   const [templateChoices, setTemplateChoices] = useState<Array<{ label: string; template: Template | null }>>([]);
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
 
   const [step, setStep] = useState<Step>(() => {
-    // If navigating from TemplatesView [U]se, skip to name
+    if (context.editingDeployment) {
+      return context.editingDeployment.mode === "edit" ? "api_key_choose" : "name";
+    }
     if (context.selectedTemplate) return "name";
     return "template_choice";
   });
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => {
+    if (context.editingDeployment?.mode === "edit") return context.editingDeployment.config.name;
+    return "";
+  });
   const [provider, setProvider] = useState<Provider>(() => {
+    if (context.editingDeployment) return context.editingDeployment.config.provider;
     return context.selectedTemplate?.provider ?? "hetzner";
   });
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState(() => {
+    if (context.editingDeployment) {
+      const cfg = context.editingDeployment.config;
+      if (cfg.provider === "hetzner" && cfg.hetzner) return cfg.hetzner.apiKey;
+      if (cfg.provider === "digitalocean" && cfg.digitalocean) return cfg.digitalocean.apiKey;
+    }
+    return "";
+  });
   const [selectedDropletSizeIndex, setSelectedDropletSizeIndex] = useState(() => {
+    if (context.editingDeployment?.config.digitalocean) {
+      const idx = DO_DROPLET_SIZES.findIndex((s) => s.slug === context.editingDeployment!.config.digitalocean!.size);
+      return idx >= 0 ? idx : 0;
+    }
     if (context.selectedTemplate?.digitalocean) {
       const idx = DO_DROPLET_SIZES.findIndex((s) => s.slug === context.selectedTemplate!.digitalocean!.size);
       return idx >= 0 ? idx : 0;
@@ -135,17 +177,32 @@ export function NewDeployment({ context }: Props) {
     return 0;
   });
   const [aiProvider, setAiProvider] = useState(() => {
+    if (context.editingDeployment?.config.openclawAgent) return context.editingDeployment.config.openclawAgent.aiProvider;
     return context.selectedTemplate?.aiProvider ?? "";
   });
-  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiApiKey, setAiApiKey] = useState(() => {
+    if (context.editingDeployment?.config.openclawAgent) return context.editingDeployment.config.openclawAgent.aiApiKey;
+    return "";
+  });
   const [model, setModel] = useState(() => {
+    if (context.editingDeployment?.config.openclawAgent) return context.editingDeployment.config.openclawAgent.model;
     return context.selectedTemplate?.model ?? "";
   });
-  const [telegramBotToken, setTelegramBotToken] = useState("");
-  const [telegramAllowFrom, setTelegramAllowFrom] = useState("");
+  const [telegramBotToken, setTelegramBotToken] = useState(() => {
+    if (context.editingDeployment?.config.openclawAgent) return context.editingDeployment.config.openclawAgent.telegramBotToken;
+    return "";
+  });
+  const [telegramAllowFrom, setTelegramAllowFrom] = useState(() => {
+    if (context.editingDeployment?.config.openclawAgent) return context.editingDeployment.config.openclawAgent.telegramAllowFrom ?? "";
+    return "";
+  });
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [selectedProviderIndex, setSelectedProviderIndex] = useState(() => {
+    if (context.editingDeployment) {
+      const idx = SUPPORTED_PROVIDERS.indexOf(context.editingDeployment.config.provider);
+      return idx >= 0 ? idx : 0;
+    }
     if (context.selectedTemplate) {
       const idx = SUPPORTED_PROVIDERS.indexOf(context.selectedTemplate.provider);
       return idx >= 0 ? idx : 0;
@@ -153,6 +210,10 @@ export function NewDeployment({ context }: Props) {
     return 0;
   });
   const [selectedAiProviderIndex, setSelectedAiProviderIndex] = useState(() => {
+    if (context.editingDeployment?.config.openclawAgent) {
+      const idx = AI_PROVIDERS.findIndex((p) => p.name === context.editingDeployment!.config.openclawAgent!.aiProvider);
+      return idx >= 0 ? idx : 0;
+    }
     if (context.selectedTemplate) {
       const idx = AI_PROVIDERS.findIndex((p) => p.name === context.selectedTemplate!.aiProvider);
       return idx >= 0 ? idx : 0;
@@ -167,14 +228,42 @@ export function NewDeployment({ context }: Props) {
   const [savedTelegramUsers, setSavedTelegramUsers] = useState<SavedSecret[]>([]);
   const [selectedSavedKeyIndex, setSelectedSavedKeyIndex] = useState(0);
   const [newKeyName, setNewKeyName] = useState("");
-  const [apiKeyFromSaved, setApiKeyFromSaved] = useState(false);
-  const [aiApiKeyFromSaved, setAiApiKeyFromSaved] = useState(false);
-  const [telegramTokenFromSaved, setTelegramTokenFromSaved] = useState(false);
-  const [telegramAllowFromSaved, setTelegramAllowFromSaved] = useState(false);
+  const [apiKeyFromSaved, setApiKeyFromSaved] = useState(() => !!context.editingDeployment);
+  const [aiApiKeyFromSaved, setAiApiKeyFromSaved] = useState(() => !!context.editingDeployment);
+  const [telegramTokenFromSaved, setTelegramTokenFromSaved] = useState(() => !!context.editingDeployment);
+  const [telegramAllowFromSaved, setTelegramAllowFromSaved] = useState(() => !!context.editingDeployment);
 
-  // Initialize template from context on mount
+  // Initialize from context on mount (template or editing deployment)
   useEffect(() => {
-    if (context.selectedTemplate) {
+    if (context.editingDeployment) {
+      const ed = context.editingDeployment;
+      setEditingConfig(ed.config);
+      setEditMode(ed.mode);
+      // Create a synthetic template so template-aware step logic works
+      const syntheticTemplate: Template = {
+        id: "__editing__",
+        name: ed.config.name,
+        description: "Editing deployment",
+        builtIn: false,
+        createdAt: ed.config.createdAt,
+        provider: ed.config.provider,
+        hetzner: ed.config.hetzner ? {
+          serverType: ed.config.hetzner.serverType,
+          location: ed.config.hetzner.location,
+          image: ed.config.hetzner.image,
+        } : undefined,
+        digitalocean: ed.config.digitalocean ? {
+          size: ed.config.digitalocean.size,
+          region: ed.config.digitalocean.region,
+          image: ed.config.digitalocean.image,
+        } : undefined,
+        aiProvider: ed.config.openclawAgent?.aiProvider ?? "",
+        model: ed.config.openclawAgent?.model ?? "",
+        channel: ed.config.openclawAgent?.channel ?? "telegram",
+      };
+      setActiveTemplate(syntheticTemplate);
+      context.setEditingDeployment(null);
+    } else if (context.selectedTemplate) {
       setActiveTemplate(context.selectedTemplate);
       context.setSelectedTemplate(null);
     }
@@ -215,20 +304,20 @@ export function NewDeployment({ context }: Props) {
   // Use refs to avoid stale closures in useKeyboard callback
   const stateRef = useRef({
     name, provider, apiKey, aiProvider, aiApiKey, model, telegramBotToken, telegramAllowFrom, step,
-    selectedDropletSizeIndex, activeTemplate,
+    selectedDropletSizeIndex, activeTemplate, editingConfig, editMode,
     savedProviderKeys, savedAiKeys, savedTelegramTokens, savedTelegramUsers, selectedSavedKeyIndex, newKeyName,
     apiKeyFromSaved, aiApiKeyFromSaved, telegramTokenFromSaved, telegramAllowFromSaved,
   });
   stateRef.current = {
     name, provider, apiKey, aiProvider, aiApiKey, model, telegramBotToken, telegramAllowFrom, step,
-    selectedDropletSizeIndex, activeTemplate,
+    selectedDropletSizeIndex, activeTemplate, editingConfig, editMode,
     savedProviderKeys, savedAiKeys, savedTelegramTokens, savedTelegramUsers, selectedSavedKeyIndex, newKeyName,
     apiKeyFromSaved, aiApiKeyFromSaved, telegramTokenFromSaved, telegramAllowFromSaved,
   };
 
   debugLog(`RENDER: step=${step}, apiKey.length=${apiKey?.length ?? "null"}`);
 
-  const stepList = getStepList(provider, activeTemplate);
+  const stepList = getStepList(provider, activeTemplate, editMode ?? undefined);
 
   const handleConfirmFromRef = () => {
     const s = stateRef.current;
@@ -276,7 +365,7 @@ export function NewDeployment({ context }: Props) {
       const config: DeploymentConfig = {
         name: s.name,
         provider: s.provider,
-        createdAt: new Date().toISOString(),
+        createdAt: s.editingConfig?.createdAt ?? new Date().toISOString(),
         hetzner: s.provider === "hetzner" ? {
           apiKey: s.apiKey,
           serverType: tmpl?.hetzner?.serverType ?? "cpx11",
@@ -300,11 +389,18 @@ export function NewDeployment({ context }: Props) {
         },
       };
 
-      createDeployment(config);
+      if (s.editingConfig && s.editMode === "edit") {
+        // Edit mode: update existing config in-place, preserve name and createdAt
+        const updatedConfig = { ...config, name: s.editingConfig.name, createdAt: s.editingConfig.createdAt };
+        updateDeploymentConfig(s.editingConfig.name, updatedConfig);
+      } else {
+        // Normal/fork mode: create new deployment
+        createDeployment(config);
+      }
       context.refreshDeployments();
       setStep("complete");
     } catch (err) {
-      setError(`Failed to create deployment: ${err instanceof Error ? err.message : String(err)}`);
+      setError(`Failed to ${s.editMode === "edit" ? "update" : "create"} deployment: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -1452,7 +1548,9 @@ export function NewDeployment({ context }: Props) {
       case "complete":
         return (
           <box flexDirection="column">
-            <text fg={t.status.success}>Deployment Configuration Created!</text>
+            <text fg={t.status.success}>
+              {editMode === "edit" ? "Deployment Updated Successfully!" : "Deployment Configuration Created!"}
+            </text>
             <box
               flexDirection="column"
               borderStyle="single"
@@ -1460,9 +1558,13 @@ export function NewDeployment({ context }: Props) {
               padding={1}
               marginTop={1}
             >
-              <text fg={t.fg.primary}>Your deployment "{name}" has been initialized.</text>
+              <text fg={t.fg.primary}>
+                {editMode === "edit"
+                  ? `Your deployment "${editingConfig?.name ?? name}" has been updated.`
+                  : `Your deployment "${name}" has been initialized.`}
+              </text>
               <text fg={t.fg.secondary} marginTop={1}>
-                Configuration saved to: ~/.clawcontrol/deployments/{name}/
+                Configuration saved to: ~/.clawcontrol/deployments/{editingConfig?.name ?? name}/
               </text>
               <text fg={t.fg.secondary} marginTop={1}>
                 AI: {aiProvider} / {model}
@@ -1471,7 +1573,9 @@ export function NewDeployment({ context }: Props) {
                 Channel: Telegram (allowed: {telegramAllowFrom})
               </text>
             </box>
-            <text fg={t.accent} marginTop={2}>Next step: Run /deploy to deploy this configuration</text>
+            {editMode !== "edit" && (
+              <text fg={t.accent} marginTop={2}>Next step: Run /deploy to deploy this configuration</text>
+            )}
             <text fg={t.fg.muted} marginTop={2}>Press any key to return to home</text>
           </box>
         );
@@ -1482,8 +1586,14 @@ export function NewDeployment({ context }: Props) {
     <box flexDirection="column" width="100%" padding={1}>
       {/* Header */}
       <box flexDirection="row" marginBottom={2}>
-        <text fg={t.accent}>/new</text>
-        <text fg={t.fg.secondary}> - Initialize a new deployment</text>
+        <text fg={t.accent}>{editMode === "edit" ? "/list" : "/new"}</text>
+        <text fg={t.fg.secondary}>
+          {editMode === "edit"
+            ? ` - Edit Deployment: ${editingConfig?.name ?? ""}`
+            : editMode === "fork"
+              ? " - Fork Deployment"
+              : " - Initialize a new deployment"}
+        </text>
       </box>
 
       {/* Progress indicator */}

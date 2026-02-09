@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from "react";
 import { useRenderer } from "@opentui/react";
-import type { ViewName, Deployment, Template } from "./types/index.js";
+import type { ViewName, Deployment, DeploymentConfig, Template } from "./types/index.js";
 import { Home } from "./components/Home.js";
 import { NewDeployment } from "./components/NewDeployment.js";
+import { ListView } from "./components/ListView.js";
 import { DeployView } from "./components/DeployView.js";
 import { DeployingView } from "./components/DeployingView.js";
 import { StatusView } from "./components/StatusView.js";
@@ -14,6 +15,11 @@ import { TemplatesView } from "./components/TemplatesView.js";
 import { getAllDeployments } from "./services/config.js";
 import { t } from "./theme.js";
 
+export interface EditingDeployment {
+  config: DeploymentConfig;
+  mode: "edit" | "fork";
+}
+
 export interface AppContext {
   navigateTo: (view: ViewName, deployment?: string) => void;
   selectedDeployment: string | null;
@@ -21,6 +27,8 @@ export interface AppContext {
   refreshDeployments: () => void;
   selectedTemplate: Template | null;
   setSelectedTemplate: (template: Template | null) => void;
+  editingDeployment: EditingDeployment | null;
+  setEditingDeployment: (ed: EditingDeployment | null) => void;
 }
 
 export function App() {
@@ -36,6 +44,7 @@ export function App() {
   });
 
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [editingDeployment, setEditingDeployment] = useState<EditingDeployment | null>(null);
 
   const wasDraggingRef = useRef(false);
 
@@ -79,6 +88,8 @@ export function App() {
     refreshDeployments,
     selectedTemplate,
     setSelectedTemplate,
+    editingDeployment,
+    setEditingDeployment,
   };
 
   const renderView = () => {
@@ -87,6 +98,8 @@ export function App() {
         return <Home context={context} />;
       case "new":
         return <NewDeployment context={context} />;
+      case "list":
+        return <ListView context={context} />;
       case "deploy":
         return <DeployView context={context} />;
       case "deploying":

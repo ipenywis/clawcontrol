@@ -247,6 +247,7 @@ export type SecretFile = z.infer<typeof SecretFileSchema>;
 // Command types
 export type CommandName =
   | "new"
+  | "list"
   | "deploy"
   | "status"
   | "ssh"
@@ -265,6 +266,7 @@ export interface Command {
 export type ViewName =
   | "home"
   | "new"
+  | "list"
   | "deploy"
   | "deploying"
   | "status"
