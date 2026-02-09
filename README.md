@@ -13,13 +13,13 @@ ClawControl makes OpenClaw setup repeatable and fast. It handles VPS provisionin
 One-liner (Linux / macOS):
 
 ```bash
-curl -fsSL https://openclaw.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ipenywis/clawcontrol/main/install.sh | bash
 ```
 
 One-liner (Windows PowerShell):
 
 ```powershell
-irm https://openclaw.ai/install.ps1 | iex
+irm https://raw.githubusercontent.com/ipenywis/clawcontrol/main/install.ps1 | iex
 ```
 
 Package managers (Bun must be installed — the install scripts handle this automatically):
