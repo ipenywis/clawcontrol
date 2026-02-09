@@ -17,6 +17,7 @@ import {
   waitForSSH,
   type SSHConnection,
 } from "./ssh.js";
+import { randomBytes } from "crypto";
 import { createHetznerClient, HetznerAPIError } from "../providers/hetzner/api.js";
 import { createDigitalOceanClient, DigitalOceanAPIError } from "../providers/digitalocean/api.js";
 import * as SetupScripts from "./setup/index.js";
@@ -188,6 +189,7 @@ export class DeploymentOrchestrator {
   private onConfirm: ConfirmCallback;
   private onOpenUrl: OpenUrlCallback;
   private onSpawnTerminal: SpawnTerminalCallback;
+  private tailscaleSkipped = false;
 
   constructor(
     deploymentName: string,
@@ -663,7 +665,13 @@ export class DeploymentOrchestrator {
     const ssh = await this.ensureSSHConnected();
     const customConfig = this.deployment.config.openclawConfig;
     const agentConfig = this.deployment.config.openclawAgent;
-    await SetupScripts.configureOpenClaw(ssh, customConfig, agentConfig);
+
+    // Generate a secure gateway auth token for dashboard access
+    const gatewayToken = randomBytes(32).toString("hex");
+    await SetupScripts.configureOpenClaw(ssh, customConfig, agentConfig, gatewayToken);
+
+    // Persist the token locally so /dashboard can use it without SSH
+    updateDeploymentState(this.deploymentName, { gatewayToken });
 
     // Write the environment file with the AI provider API key
     if (agentConfig) {
@@ -673,12 +681,24 @@ export class DeploymentOrchestrator {
   }
 
   private async installTailscale(): Promise<void> {
+    if (this.deployment.config.skipTailscale) {
+      this.tailscaleSkipped = true;
+      this.reportProgress("tailscale_installed", "Tailscale setup skipped.");
+      return;
+    }
+
     const ssh = await this.ensureSSHConnected();
     await SetupScripts.installTailscale(ssh);
   }
 
   private async authenticateTailscale(): Promise<void> {
+    if (this.tailscaleSkipped) return;
+
     const ssh = await this.ensureSSHConnected();
+
+    // Handle resume: if tailscale isn't installed it was skipped previously
+    const check = await ssh.exec("which tailscale 2>/dev/null");
+    if (check.code !== 0) return;
 
     // Get the auth URL
     const authUrl = await SetupScripts.getTailscaleAuthUrl(ssh);
@@ -706,7 +726,14 @@ export class DeploymentOrchestrator {
   }
 
   private async configureTailscale(): Promise<void> {
+    if (this.tailscaleSkipped) return;
+
     const ssh = await this.ensureSSHConnected();
+
+    // Handle resume: if tailscale isn't installed it was skipped previously
+    const check = await ssh.exec("which tailscale 2>/dev/null");
+    if (check.code !== 0) return;
+
     const tailscaleIp = await SetupScripts.configureTailscaleServe(ssh);
 
     updateDeploymentState(this.deploymentName, {

@@ -12,6 +12,7 @@ import { LogsView } from "./components/LogsView.js";
 import { DestroyView } from "./components/DestroyView.js";
 import { HelpView } from "./components/HelpView.js";
 import { TemplatesView } from "./components/TemplatesView.js";
+import { DashboardView } from "./components/DashboardView.js";
 import { getAllDeployments } from "./services/config.js";
 import { t } from "./theme.js";
 
@@ -110,6 +111,8 @@ export function App() {
         return <SSHView context={context} />;
       case "logs":
         return <LogsView context={context} />;
+      case "dashboard":
+        return <DashboardView context={context} />;
       case "destroy":
         return <DestroyView context={context} />;
       case "help":

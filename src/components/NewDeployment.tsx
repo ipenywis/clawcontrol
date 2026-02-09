@@ -54,6 +54,7 @@ type Step =
   | "telegram_allow_from"
   | "telegram_allow_save"
   | "telegram_allow_name"
+  | "tailscale"
   | "confirm"
   | "complete";
 
@@ -85,7 +86,7 @@ function getStepList(provider: Provider, activeTemplate: Template | null, editMo
     if (provider === "digitalocean") {
       steps.push("droplet_size");
     }
-    steps.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
+    steps.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "tailscale", "confirm");
     return steps;
   }
 
@@ -96,14 +97,14 @@ function getStepList(provider: Provider, activeTemplate: Template | null, editMo
     if (provider === "digitalocean") {
       base.push("droplet_size");
     }
-    base.push("ai_provider", "ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
+    base.push("ai_provider", "ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "tailscale", "confirm");
   } else {
     // Template active: skip provider, ai_provider (auto-set from template)
     base.push("name", "api_key_choose");
     if (activeTemplate.provider === "digitalocean") {
       base.push("droplet_size");
     }
-    base.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
+    base.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "tailscale", "confirm");
   }
   return base;
 }
@@ -195,6 +196,14 @@ export function NewDeployment({ context }: Props) {
   const [telegramAllowFrom, setTelegramAllowFrom] = useState(() => {
     if (context.editingDeployment?.config.openclawAgent) return context.editingDeployment.config.openclawAgent.telegramAllowFrom ?? "";
     return "";
+  });
+  const [enableTailscale, setEnableTailscale] = useState(() => {
+    if (context.editingDeployment?.mode === "fork") return !context.editingDeployment.config.skipTailscale;
+    return false;
+  });
+  const [selectedTailscaleIndex, setSelectedTailscaleIndex] = useState(() => {
+    if (context.editingDeployment?.mode === "fork" && !context.editingDeployment.config.skipTailscale) return 1;
+    return 0;
   });
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -307,12 +316,14 @@ export function NewDeployment({ context }: Props) {
     selectedDropletSizeIndex, activeTemplate, editingConfig, editMode,
     savedProviderKeys, savedAiKeys, savedTelegramTokens, savedTelegramUsers, selectedSavedKeyIndex, newKeyName,
     apiKeyFromSaved, aiApiKeyFromSaved, telegramTokenFromSaved, telegramAllowFromSaved,
+    enableTailscale, selectedTailscaleIndex,
   });
   stateRef.current = {
     name, provider, apiKey, aiProvider, aiApiKey, model, telegramBotToken, telegramAllowFrom, step,
     selectedDropletSizeIndex, activeTemplate, editingConfig, editMode,
     savedProviderKeys, savedAiKeys, savedTelegramTokens, savedTelegramUsers, selectedSavedKeyIndex, newKeyName,
     apiKeyFromSaved, aiApiKeyFromSaved, telegramTokenFromSaved, telegramAllowFromSaved,
+    enableTailscale, selectedTailscaleIndex,
   };
 
   debugLog(`RENDER: step=${step}, apiKey.length=${apiKey?.length ?? "null"}`);
@@ -379,6 +390,7 @@ export function NewDeployment({ context }: Props) {
           image: tmpl?.digitalocean?.image ?? "ubuntu-24-04-x64",
         } : undefined,
         openclawConfig: undefined,
+        skipTailscale: !s.enableTailscale,
         openclawAgent: {
           aiProvider: s.aiProvider,
           aiApiKey: s.aiApiKey,
@@ -598,7 +610,7 @@ export function NewDeployment({ context }: Props) {
           setTelegramAllowFrom(saved.value);
           setTelegramAllowFromSaved(true);
           setError(null);
-          setStep("confirm");
+          setStep(currentState.editMode === "edit" ? "confirm" : "tailscale");
         }
       } else if (key.name === "escape") {
         setStep("telegram_token_choose");
@@ -635,13 +647,26 @@ export function NewDeployment({ context }: Props) {
         setStep("telegram_allow_name");
         setNewKeyName("");
       } else if (key.name === "n" || key.name === "escape") {
+        setStep(currentState.editMode === "edit" ? "confirm" : "tailscale");
+      }
+    } else if (currentState.step === "tailscale") {
+      const TAILSCALE_OPTIONS = ["Skip", "Configure Tailscale"];
+      if (key.name === "up") {
+        setSelectedTailscaleIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.name === "down") {
+        setSelectedTailscaleIndex((prev) => Math.min(TAILSCALE_OPTIONS.length - 1, prev + 1));
+      } else if (key.name === "return") {
+        setEnableTailscale(currentState.selectedTailscaleIndex === 1);
+        setError(null);
         setStep("confirm");
+      } else if (key.name === "escape") {
+        setStep("telegram_allow_choose");
       }
     } else if (currentState.step === "confirm") {
       if (key.name === "y" || key.name === "return") {
         handleConfirmFromRef();
       } else if (key.name === "n" || key.name === "escape") {
-        setStep("telegram_allow_choose");
+        setStep(currentState.editMode === "edit" ? "telegram_allow_choose" : "tailscale");
       }
     } else if (currentState.step === "complete") {
       context.navigateTo("home");
@@ -779,7 +804,7 @@ export function NewDeployment({ context }: Props) {
     }
     setError(null);
     if (telegramAllowFromSaved) {
-      setStep("confirm");
+      setStep(editMode === "edit" ? "confirm" : "tailscale");
     } else {
       setStep("telegram_allow_save");
     }
@@ -1472,10 +1497,10 @@ export function NewDeployment({ context }: Props) {
                   setNewKeyName(value);
                 }
               }}
-              onSubmit={() => handleSaveKeyName("telegram-user", telegramAllowFrom, "confirm")}
+              onSubmit={() => handleSaveKeyName("telegram-user", telegramAllowFrom, editMode === "edit" ? "confirm" : "tailscale")}
               onKeyDown={(e) => {
                 if (e.name === "escape") {
-                  setStep("confirm");
+                  setStep(editMode === "edit" ? "confirm" : "tailscale");
                 }
               }}
             />
@@ -1483,6 +1508,46 @@ export function NewDeployment({ context }: Props) {
             <text fg={t.fg.muted} marginTop={2}>Press Enter to save, Esc to skip</text>
           </box>
         );
+
+      case "tailscale": {
+        const tailscaleOptions = [
+          { label: "Skip", description: "Use SSH tunnel via /dashboard instead" },
+          { label: "Configure Tailscale", description: "Private VPN between your devices and the server" },
+        ];
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Step {currentStepNumber("tailscale")}: Tailscale Setup (Optional)</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Tailscale creates a private VPN between your devices and your OpenClaw server.
+            </text>
+            <text fg={t.fg.secondary}>
+              You can skip this and use an SSH tunnel instead (the /dashboard command sets one up automatically).
+            </text>
+            <box
+              flexDirection="column"
+              borderStyle="single"
+              borderColor={t.border.default}
+              marginTop={1}
+              padding={1}
+            >
+              {tailscaleOptions.map((opt, i) => {
+                const isSelected = i === selectedTailscaleIndex;
+                return (
+                  <box key={opt.label} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>
+                      {isSelected ? "> " : "  "}
+                    </text>
+                    <text fg={isSelected ? t.selection.fg : t.fg.primary}>{opt.label}</text>
+                    <text fg={isSelected ? t.fg.primary : t.fg.secondary}>{" - " + opt.description}</text>
+                  </box>
+                );
+              })}
+            </box>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
+          </box>
+        );
+      }
 
       case "confirm":
         return (
@@ -1538,6 +1603,12 @@ export function NewDeployment({ context }: Props) {
               <box flexDirection="row">
                 <text fg={t.fg.secondary} width={20}>Allow From:</text>
                 <text fg={t.fg.primary}>{telegramAllowFrom || "N/A"}</text>
+              </box>
+              <box flexDirection="row">
+                <text fg={t.fg.secondary} width={20}>Tailscale:</text>
+                <text fg={enableTailscale ? t.status.success : t.fg.muted}>
+                  {enableTailscale ? "Enabled" : "Skipped"}
+                </text>
               </box>
             </box>
             {error && <text fg={t.status.error} marginTop={1}>{error}</text>}

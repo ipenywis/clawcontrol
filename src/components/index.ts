@@ -6,6 +6,7 @@ export { DeployingView } from "./DeployingView.js";
 export { StatusView } from "./StatusView.js";
 export { SSHView } from "./SSHView.js";
 export { LogsView } from "./LogsView.js";
+export { DashboardView } from "./DashboardView.js";
 export { DestroyView } from "./DestroyView.js";
 export { HelpView } from "./HelpView.js";
 export { TemplatesView } from "./TemplatesView.js";

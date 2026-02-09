@@ -23,6 +23,7 @@ const COMMANDS = [
   { name: "/status", description: "View deployment status" },
   { name: "/ssh", description: "SSH into a deployment" },
   { name: "/logs", description: "View deployment logs" },
+  { name: "/dashboard", description: "Open OpenClaw dashboard in browser" },
   { name: "/destroy", description: "Destroy a deployment" },
   { name: "/templates", description: "Manage deployment templates" },
   { name: "/help", description: "Show help" },
@@ -43,6 +44,7 @@ export function Home({ context }: Props) {
       "/status": "status",
       "/ssh": "ssh",
       "/logs": "logs",
+      "/dashboard": "dashboard",
       "/destroy": "destroy",
       "/templates": "templates",
       "/help": "help",
@@ -108,7 +110,7 @@ export function Home({ context }: Props) {
             <box flexDirection="column" marginTop={1}>
               {COMMANDS.map((cmd) => (
                 <box key={cmd.name} flexDirection="row">
-                  <text fg={t.accent} width={12}>{cmd.name}</text>
+                  <text fg={t.accent} width={14}>{cmd.name}</text>
                   <text fg={t.fg.secondary}>{cmd.description}</text>
                 </box>
               ))}

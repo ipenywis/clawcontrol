@@ -233,12 +233,15 @@ export async function installOpenClaw(ssh: SSHConnection): Promise<void> {
 }
 
 /**
- * Configure OpenClaw with browser, gateway, agent, and channel settings
+ * Configure OpenClaw with browser, gateway, agent, and channel settings.
+ * When a gatewayToken is provided it is written to gateway.auth.token so
+ * the dashboard requires authentication.
  */
 export async function configureOpenClaw(
   ssh: SSHConnection,
   customConfig?: OpenClawConfig,
-  agentConfig?: OpenClawAgentConfig
+  agentConfig?: OpenClawAgentConfig,
+  gatewayToken?: string
 ): Promise<void> {
   // Ensure config directory exists
   await ssh.exec("mkdir -p ~/.openclaw");
@@ -264,6 +267,7 @@ export async function configureOpenClaw(
       port: 18789,
       mode: "local",
       bind: "loopback",
+      ...(gatewayToken ? { auth: { token: gatewayToken } } : {}),
       tailscale: {
         mode: "serve",
         resetOnExit: false,
@@ -672,5 +676,59 @@ export async function restartOpenClawDaemon(ssh: SSHConnection): Promise<void> {
     ssh,
     "systemctl restart openclaw",
     "Failed to restart OpenClaw daemon"
+  );
+}
+
+/**
+ * Get the dashboard URL from a running OpenClaw instance.
+ * Tries `openclaw dashboard` first, falls back to reading the gateway auth token.
+ * Returns the full URL (with token) and the remote gateway port.
+ */
+export async function getDashboardUrl(
+  ssh: SSHConnection
+): Promise<{ url: string; port: number }> {
+  const nvmPrefix = "source ~/.nvm/nvm.sh &&";
+
+  // Strategy 1: Run `openclaw dashboard` and parse the URL from output
+  const dashResult = await ssh.exec(
+    `${nvmPrefix} timeout 10 openclaw dashboard 2>&1 || true`
+  );
+  const rawOutput = dashResult.stdout + "\n" + dashResult.stderr;
+  // Strip ANSI escape codes
+  const output = rawOutput.replace(/\x1b\[[0-9;]*m/g, "");
+
+  const urlMatch = output.match(/https?:\/\/[^\s\])'"<>]+/);
+  if (urlMatch) {
+    try {
+      const parsed = new URL(urlMatch[0]);
+      return { url: urlMatch[0], port: parseInt(parsed.port) || 18789 };
+    } catch {
+      // URL parsing failed, continue to fallback
+    }
+  }
+
+  // Strategy 2: Read the gateway auth token from config
+  const tokenResult = await ssh.exec(
+    `${nvmPrefix} openclaw config get gateway.auth.token 2>/dev/null || true`
+  );
+  const token = tokenResult.stdout.trim().replace(/^["']|["']$/g, "");
+
+  if (token) {
+    return {
+      url: `http://127.0.0.1:18789/?token=${encodeURIComponent(token)}`,
+      port: 18789,
+    };
+  }
+
+  // Strategy 3: Verify gateway is running at all
+  const statusResult = await ssh.exec(
+    "systemctl is-active openclaw 2>/dev/null || true"
+  );
+  if (statusResult.stdout.trim() !== "active") {
+    throw new Error("OpenClaw gateway is not running on this server");
+  }
+
+  throw new Error(
+    "Could not retrieve dashboard URL. Try running 'openclaw dashboard' on the server manually."
   );
 }

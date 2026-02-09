@@ -172,6 +172,7 @@ export const DeploymentConfigSchema = z.object({
   digitalocean: DigitalOceanConfigSchema.optional(),
   openclawConfig: OpenClawConfigSchema,
   openclawAgent: OpenClawAgentConfigSchema.optional(),
+  skipTailscale: z.boolean().optional(),
 });
 
 export type DeploymentConfig = z.infer<typeof DeploymentConfigSchema>;
@@ -191,6 +192,7 @@ export const DeploymentStateSchema = z.object({
       retryCount: z.number(),
     })
   ),
+  gatewayToken: z.string().optional(),
   lastError: z.string().optional(),
   deployedAt: z.string().optional(),
   updatedAt: z.string(),
@@ -252,6 +254,7 @@ export type CommandName =
   | "status"
   | "ssh"
   | "logs"
+  | "dashboard"
   | "destroy"
   | "help"
   | "templates";
@@ -272,6 +275,7 @@ export type ViewName =
   | "status"
   | "ssh"
   | "logs"
+  | "dashboard"
   | "destroy"
   | "help"
   | "templates";
