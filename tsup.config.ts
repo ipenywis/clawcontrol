@@ -7,9 +7,10 @@ export default defineConfig({
   target: "es2022",
   platform: "node",
   banner: {
-    js: "#!/usr/bin/env node",
+    js: "#!/usr/bin/env bun",
   },
-  // Keep OpenTUI and native modules external - OpenTUI requires Bun runtime
+  // @opentui/core uses bun:ffi and Bun-specific import attributes, so it
+  // must stay external and be resolved at runtime by the Bun runtime.
   external: [
     "@opentui/core",
     "@opentui/react",

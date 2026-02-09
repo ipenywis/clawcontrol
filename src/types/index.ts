@@ -230,6 +230,20 @@ export const TemplateSchema = z.object({
 
 export type Template = z.infer<typeof TemplateSchema>;
 
+// Saved secret types (for reusable API key storage)
+export const SavedSecretSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  value: z.string().min(1),
+  createdAt: z.string(),
+});
+export type SavedSecret = z.infer<typeof SavedSecretSchema>;
+
+export const SecretFileSchema = z.object({
+  keys: z.array(SavedSecretSchema),
+});
+export type SecretFile = z.infer<typeof SecretFileSchema>;
+
 // Command types
 export type CommandName =
   | "new"

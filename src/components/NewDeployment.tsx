@@ -4,12 +4,13 @@ import { appendFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import type { AppContext } from "../App.js";
-import type { Provider, DeploymentConfig, Template } from "../types/index.js";
+import type { Provider, DeploymentConfig, Template, SavedSecret } from "../types/index.js";
 import {
   createDeployment,
   validateDeploymentName,
 } from "../services/config.js";
 import { getAllTemplates } from "../services/templates.js";
+import { getSecretsForService, saveSecret } from "../services/secrets.js";
 import { createHetznerClient } from "../providers/hetzner/api.js";
 import { createDigitalOceanClient } from "../providers/digitalocean/api.js";
 import { SUPPORTED_PROVIDERS, PROVIDER_NAMES, AI_PROVIDERS } from "../providers/index.js";
@@ -33,13 +34,25 @@ type Step =
   | "template_choice"
   | "name"
   | "provider"
+  | "api_key_choose"
   | "api_key"
+  | "api_key_save"
+  | "api_key_name"
   | "droplet_size"
   | "ai_provider"
+  | "ai_api_key_choose"
   | "ai_api_key"
+  | "ai_api_key_save"
+  | "ai_api_key_name"
   | "model"
+  | "telegram_token_choose"
   | "telegram_bot_token"
+  | "telegram_token_save"
+  | "telegram_token_name"
+  | "telegram_allow_choose"
   | "telegram_allow_from"
+  | "telegram_allow_save"
+  | "telegram_allow_name"
   | "confirm"
   | "complete";
 
@@ -58,20 +71,44 @@ function getStepList(provider: Provider, activeTemplate: Template | null): Step[
   const base: Step[] = ["template_choice"];
 
   if (!activeTemplate) {
-    base.push("name", "provider", "api_key");
+    base.push("name", "provider", "api_key_choose");
     if (provider === "digitalocean") {
       base.push("droplet_size");
     }
-    base.push("ai_provider", "ai_api_key", "model", "telegram_bot_token", "telegram_allow_from", "confirm");
+    base.push("ai_provider", "ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
   } else {
     // Template active: skip provider, ai_provider (auto-set from template)
-    base.push("name", "api_key");
+    base.push("name", "api_key_choose");
     if (activeTemplate.provider === "digitalocean") {
       base.push("droplet_size");
     }
-    base.push("ai_api_key", "model", "telegram_bot_token", "telegram_allow_from", "confirm");
+    base.push("ai_api_key_choose", "model", "telegram_token_choose", "telegram_allow_choose", "confirm");
   }
   return base;
+}
+
+// Maps sub-steps to their parent step for progress indicator
+function resolveStepForProgress(s: Step): Step {
+  switch (s) {
+    case "api_key":
+    case "api_key_save":
+    case "api_key_name":
+      return "api_key_choose";
+    case "ai_api_key":
+    case "ai_api_key_save":
+    case "ai_api_key_name":
+      return "ai_api_key_choose";
+    case "telegram_bot_token":
+    case "telegram_token_save":
+    case "telegram_token_name":
+      return "telegram_token_choose";
+    case "telegram_allow_from":
+    case "telegram_allow_save":
+    case "telegram_allow_name":
+      return "telegram_allow_choose";
+    default:
+      return s;
+  }
 }
 
 export function NewDeployment({ context }: Props) {
@@ -123,6 +160,18 @@ export function NewDeployment({ context }: Props) {
     return 0;
   });
 
+  // Saved key state
+  const [savedProviderKeys, setSavedProviderKeys] = useState<SavedSecret[]>([]);
+  const [savedAiKeys, setSavedAiKeys] = useState<SavedSecret[]>([]);
+  const [savedTelegramTokens, setSavedTelegramTokens] = useState<SavedSecret[]>([]);
+  const [savedTelegramUsers, setSavedTelegramUsers] = useState<SavedSecret[]>([]);
+  const [selectedSavedKeyIndex, setSelectedSavedKeyIndex] = useState(0);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [apiKeyFromSaved, setApiKeyFromSaved] = useState(false);
+  const [aiApiKeyFromSaved, setAiApiKeyFromSaved] = useState(false);
+  const [telegramTokenFromSaved, setTelegramTokenFromSaved] = useState(false);
+  const [telegramAllowFromSaved, setTelegramAllowFromSaved] = useState(false);
+
   // Initialize template from context on mount
   useEffect(() => {
     if (context.selectedTemplate) {
@@ -146,14 +195,35 @@ export function NewDeployment({ context }: Props) {
     }
   }, []);
 
+  // Load saved keys when entering a *_choose step
+  useEffect(() => {
+    if (step === "api_key_choose") {
+      setSavedProviderKeys(getSecretsForService(provider));
+      setSelectedSavedKeyIndex(0);
+    } else if (step === "ai_api_key_choose") {
+      setSavedAiKeys(getSecretsForService(aiProvider));
+      setSelectedSavedKeyIndex(0);
+    } else if (step === "telegram_token_choose") {
+      setSavedTelegramTokens(getSecretsForService("telegram"));
+      setSelectedSavedKeyIndex(0);
+    } else if (step === "telegram_allow_choose") {
+      setSavedTelegramUsers(getSecretsForService("telegram-user"));
+      setSelectedSavedKeyIndex(0);
+    }
+  }, [step]);
+
   // Use refs to avoid stale closures in useKeyboard callback
   const stateRef = useRef({
     name, provider, apiKey, aiProvider, aiApiKey, model, telegramBotToken, telegramAllowFrom, step,
     selectedDropletSizeIndex, activeTemplate,
+    savedProviderKeys, savedAiKeys, savedTelegramTokens, savedTelegramUsers, selectedSavedKeyIndex, newKeyName,
+    apiKeyFromSaved, aiApiKeyFromSaved, telegramTokenFromSaved, telegramAllowFromSaved,
   });
   stateRef.current = {
     name, provider, apiKey, aiProvider, aiApiKey, model, telegramBotToken, telegramAllowFrom, step,
     selectedDropletSizeIndex, activeTemplate,
+    savedProviderKeys, savedAiKeys, savedTelegramTokens, savedTelegramUsers, selectedSavedKeyIndex, newKeyName,
+    apiKeyFromSaved, aiApiKeyFromSaved, telegramTokenFromSaved, telegramAllowFromSaved,
   };
 
   debugLog(`RENDER: step=${step}, apiKey.length=${apiKey?.length ?? "null"}`);
@@ -167,7 +237,7 @@ export function NewDeployment({ context }: Props) {
 
     if (!s.apiKey.trim()) {
       setError("API key is missing. Please go back and re-enter your API key.");
-      setStep("api_key");
+      setStep("api_key_choose");
       return;
     }
 
@@ -179,7 +249,7 @@ export function NewDeployment({ context }: Props) {
 
     if (!s.aiApiKey.trim()) {
       setError("AI provider API key is required.");
-      setStep("ai_api_key");
+      setStep("ai_api_key_choose");
       return;
     }
 
@@ -191,13 +261,13 @@ export function NewDeployment({ context }: Props) {
 
     if (!s.telegramBotToken.trim()) {
       setError("Telegram bot token is required.");
-      setStep("telegram_bot_token");
+      setStep("telegram_token_choose");
       return;
     }
 
     if (!s.telegramAllowFrom.trim()) {
       setError("Telegram user ID is required for access control.");
-      setStep("telegram_allow_from");
+      setStep("telegram_allow_choose");
       return;
     }
 
@@ -289,12 +359,12 @@ export function NewDeployment({ context }: Props) {
       } else if (key.name === "return") {
         setError(null);
         if (currentState.activeTemplate) {
-          setStep("ai_api_key");
+          setStep("ai_api_key_choose");
         } else {
           setStep("ai_provider");
         }
       } else if (key.name === "escape") {
-        setStep("api_key");
+        setStep("api_key_choose");
       }
     } else if (currentState.step === "ai_provider") {
       if (key.name === "up") {
@@ -307,14 +377,175 @@ export function NewDeployment({ context }: Props) {
         if (currentState.provider === "digitalocean") {
           setStep("droplet_size");
         } else {
-          setStep("api_key");
+          setStep("api_key_choose");
         }
+      }
+    } else if (currentState.step === "api_key_choose") {
+      const keys = currentState.savedProviderKeys;
+      const totalOptions = 1 + keys.length; // "Enter new" + saved keys
+      if (key.name === "up") {
+        setSelectedSavedKeyIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.name === "down") {
+        setSelectedSavedKeyIndex((prev) => Math.min(totalOptions - 1, prev + 1));
+      } else if (key.name === "return") {
+        const idx = currentState.selectedSavedKeyIndex;
+        if (idx === 0) {
+          // Enter a new key
+          setApiKeyFromSaved(false);
+          setStep("api_key");
+          setError(null);
+        } else {
+          // Use saved key
+          const saved = keys[idx - 1];
+          setApiKey(saved.value);
+          setApiKeyFromSaved(true);
+          setError(null);
+          // Validate and proceed
+          setIsValidating(true);
+          (async () => {
+            try {
+              let isValid: boolean;
+              if (currentState.provider === "digitalocean") {
+                const client = createDigitalOceanClient(saved.value);
+                isValid = await client.validateAPIKey();
+              } else {
+                const client = createHetznerClient(saved.value);
+                isValid = await client.validateAPIKey();
+              }
+              if (!isValid) {
+                setError("Saved API key is no longer valid.");
+                setIsValidating(false);
+                return;
+              }
+              setIsValidating(false);
+              if (currentState.provider === "digitalocean") {
+                setStep("droplet_size");
+              } else if (currentState.activeTemplate) {
+                setStep("ai_api_key_choose");
+              } else {
+                setStep("ai_provider");
+              }
+            } catch (err) {
+              setError(`Failed to validate API key: ${err instanceof Error ? err.message : String(err)}`);
+              setIsValidating(false);
+            }
+          })();
+        }
+      } else if (key.name === "escape") {
+        setStep(currentState.activeTemplate ? "name" : "provider");
+      }
+    } else if (currentState.step === "ai_api_key_choose") {
+      const keys = currentState.savedAiKeys;
+      const totalOptions = 1 + keys.length;
+      if (key.name === "up") {
+        setSelectedSavedKeyIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.name === "down") {
+        setSelectedSavedKeyIndex((prev) => Math.min(totalOptions - 1, prev + 1));
+      } else if (key.name === "return") {
+        const idx = currentState.selectedSavedKeyIndex;
+        if (idx === 0) {
+          setAiApiKeyFromSaved(false);
+          setStep("ai_api_key");
+          setError(null);
+        } else {
+          const saved = keys[idx - 1];
+          setAiApiKey(saved.value);
+          setAiApiKeyFromSaved(true);
+          setError(null);
+          setStep("model");
+        }
+      } else if (key.name === "escape") {
+        if (currentState.activeTemplate) {
+          setStep(currentState.provider === "digitalocean" ? "droplet_size" : "api_key_choose");
+        } else {
+          setStep("ai_provider");
+        }
+      }
+    } else if (currentState.step === "telegram_token_choose") {
+      const keys = currentState.savedTelegramTokens;
+      const totalOptions = 1 + keys.length;
+      if (key.name === "up") {
+        setSelectedSavedKeyIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.name === "down") {
+        setSelectedSavedKeyIndex((prev) => Math.min(totalOptions - 1, prev + 1));
+      } else if (key.name === "return") {
+        const idx = currentState.selectedSavedKeyIndex;
+        if (idx === 0) {
+          setTelegramTokenFromSaved(false);
+          setStep("telegram_bot_token");
+          setError(null);
+        } else {
+          const saved = keys[idx - 1];
+          setTelegramBotToken(saved.value);
+          setTelegramTokenFromSaved(true);
+          setError(null);
+          setStep("telegram_allow_choose");
+        }
+      } else if (key.name === "escape") {
+        setStep("model");
+      }
+    } else if (currentState.step === "telegram_allow_choose") {
+      const keys = currentState.savedTelegramUsers;
+      const totalOptions = 1 + keys.length;
+      if (key.name === "up") {
+        setSelectedSavedKeyIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.name === "down") {
+        setSelectedSavedKeyIndex((prev) => Math.min(totalOptions - 1, prev + 1));
+      } else if (key.name === "return") {
+        const idx = currentState.selectedSavedKeyIndex;
+        if (idx === 0) {
+          setTelegramAllowFromSaved(false);
+          setStep("telegram_allow_from");
+          setError(null);
+        } else {
+          const saved = keys[idx - 1];
+          setTelegramAllowFrom(saved.value);
+          setTelegramAllowFromSaved(true);
+          setError(null);
+          setStep("confirm");
+        }
+      } else if (key.name === "escape") {
+        setStep("telegram_token_choose");
+      }
+    } else if (currentState.step === "api_key_save") {
+      if (key.name === "y") {
+        setStep("api_key_name");
+        setNewKeyName("");
+      } else if (key.name === "n" || key.name === "escape") {
+        if (currentState.provider === "digitalocean") {
+          setStep("droplet_size");
+        } else if (currentState.activeTemplate) {
+          setStep("ai_api_key_choose");
+        } else {
+          setStep("ai_provider");
+        }
+      }
+    } else if (currentState.step === "ai_api_key_save") {
+      if (key.name === "y") {
+        setStep("ai_api_key_name");
+        setNewKeyName("");
+      } else if (key.name === "n" || key.name === "escape") {
+        setStep("model");
+      }
+    } else if (currentState.step === "telegram_token_save") {
+      if (key.name === "y") {
+        setStep("telegram_token_name");
+        setNewKeyName("");
+      } else if (key.name === "n" || key.name === "escape") {
+        setStep("telegram_allow_choose");
+      }
+    } else if (currentState.step === "telegram_allow_save") {
+      if (key.name === "y") {
+        setStep("telegram_allow_name");
+        setNewKeyName("");
+      } else if (key.name === "n" || key.name === "escape") {
+        setStep("confirm");
       }
     } else if (currentState.step === "confirm") {
       if (key.name === "y" || key.name === "return") {
         handleConfirmFromRef();
       } else if (key.name === "n" || key.name === "escape") {
-        setStep("telegram_allow_from");
+        setStep("telegram_allow_choose");
       }
     } else if (currentState.step === "complete") {
       context.navigateTo("home");
@@ -330,7 +561,7 @@ export function NewDeployment({ context }: Props) {
     setError(null);
     if (activeTemplate) {
       // Skip provider step when template is active
-      setStep("api_key");
+      setStep("api_key_choose");
     } else {
       setStep("provider");
     }
@@ -338,7 +569,7 @@ export function NewDeployment({ context }: Props) {
 
   const handleProviderSubmit = () => {
     setProvider(SUPPORTED_PROVIDERS[selectedProviderIndex]);
-    setStep("api_key");
+    setStep("api_key_choose");
   };
 
   const handleApiKeySubmit = async () => {
@@ -369,12 +600,17 @@ export function NewDeployment({ context }: Props) {
       }
 
       debugLog(`  SUCCESS: Moving to next step`);
-      if (provider === "digitalocean") {
-        setStep("droplet_size");
-      } else if (activeTemplate) {
-        setStep("ai_api_key");
+      if (apiKeyFromSaved) {
+        // Already saved, skip save prompt
+        if (provider === "digitalocean") {
+          setStep("droplet_size");
+        } else if (activeTemplate) {
+          setStep("ai_api_key_choose");
+        } else {
+          setStep("ai_provider");
+        }
       } else {
-        setStep("ai_provider");
+        setStep("api_key_save");
       }
     } catch (err) {
       setError(`Failed to validate API key: ${err instanceof Error ? err.message : String(err)}`);
@@ -387,7 +623,7 @@ export function NewDeployment({ context }: Props) {
     const selected = AI_PROVIDERS[selectedAiProviderIndex];
     setAiProvider(selected.name);
     setError(null);
-    setStep("ai_api_key");
+    setStep("ai_api_key_choose");
   };
 
   const handleAiApiKeySubmit = () => {
@@ -396,7 +632,11 @@ export function NewDeployment({ context }: Props) {
       return;
     }
     setError(null);
-    setStep("model");
+    if (aiApiKeyFromSaved) {
+      setStep("model");
+    } else {
+      setStep("ai_api_key_save");
+    }
   };
 
   const handleModelSubmit = () => {
@@ -405,7 +645,7 @@ export function NewDeployment({ context }: Props) {
       return;
     }
     setError(null);
-    setStep("telegram_bot_token");
+    setStep("telegram_token_choose");
   };
 
   const handleTelegramBotTokenSubmit = () => {
@@ -414,7 +654,26 @@ export function NewDeployment({ context }: Props) {
       return;
     }
     setError(null);
-    setStep("telegram_allow_from");
+    if (telegramTokenFromSaved) {
+      setStep("telegram_allow_choose");
+    } else {
+      setStep("telegram_token_save");
+    }
+  };
+
+  const handleSaveKeyName = (service: string, value: string, nextStep: Step) => {
+    if (!newKeyName.trim()) {
+      setError("Name is required");
+      return;
+    }
+    try {
+      saveSecret(service, newKeyName.trim(), value);
+      setError(null);
+      setNewKeyName("");
+      setStep(nextStep);
+    } catch (err) {
+      setError(`Failed to save key: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const handleTelegramAllowFromSubmit = () => {
@@ -423,7 +682,16 @@ export function NewDeployment({ context }: Props) {
       return;
     }
     setError(null);
-    setStep("confirm");
+    if (telegramAllowFromSaved) {
+      setStep("confirm");
+    } else {
+      setStep("telegram_allow_save");
+    }
+  };
+
+  const getAiProviderLabel = (): string => {
+    const found = AI_PROVIDERS.find((p) => p.name === aiProvider);
+    return found?.label || aiProvider || "AI Provider";
   };
 
   const getAiProviderHint = (): string => {
@@ -472,7 +740,8 @@ export function NewDeployment({ context }: Props) {
   };
 
   const currentStepNumber = (s: Step): number => {
-    const idx = stepList.indexOf(s);
+    const resolved = resolveStepForProgress(s);
+    const idx = stepList.indexOf(resolved);
     return idx >= 0 ? idx + 1 : 0;
   };
 
@@ -575,6 +844,45 @@ export function NewDeployment({ context }: Props) {
           </box>
         );
 
+      case "api_key_choose":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Step {currentStepNumber("api_key_choose")}: {getApiKeyLabel()}</text>
+            <text fg={t.fg.secondary} marginTop={1}>Choose a saved key or enter a new one:</text>
+            <box
+              flexDirection="column"
+              borderStyle="single"
+              borderColor={t.border.default}
+              marginTop={1}
+              padding={1}
+            >
+              <box flexDirection="row" backgroundColor={selectedSavedKeyIndex === 0 ? t.selection.bg : undefined}>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.indicator : t.fg.primary}>
+                  {selectedSavedKeyIndex === 0 ? "> " : "  "}
+                </text>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.fg : t.fg.primary}>Enter a new API key</text>
+              </box>
+              {savedProviderKeys.map((k, i) => {
+                const idx = i + 1;
+                const isSelected = idx === selectedSavedKeyIndex;
+                return (
+                  <box key={k.id} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>
+                      {isSelected ? "> " : "  "}
+                    </text>
+                    <text fg={isSelected ? t.selection.fg : t.fg.primary}>
+                      {k.name} ({k.value.substring(0, 8)}...)
+                    </text>
+                  </box>
+                );
+              })}
+            </box>
+            {isValidating && <text fg={t.status.warning} marginTop={1}>Validating API key...</text>}
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
+          </box>
+        );
+
       case "api_key":
         return (
           <box flexDirection="column">
@@ -601,12 +909,60 @@ export function NewDeployment({ context }: Props) {
               }}
               onKeyDown={(e) => {
                 if (e.name === "escape") {
-                  setStep(activeTemplate ? "name" : "provider");
+                  setStep("api_key_choose");
                 }
               }}
             />
             {isValidating && <text fg={t.status.warning} marginTop={1}>Validating API key...</text>}
             {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+          </box>
+        );
+
+      case "api_key_save":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Save API Key</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Would you like to save this API key for future deployments?
+            </text>
+            <text fg={t.status.warning} marginTop={2}>Press Y to save, N to skip</text>
+          </box>
+        );
+
+      case "api_key_name":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Name Your API Key</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Enter a name to identify this key (e.g. 'prod-hetzner', 'my-account'):
+            </text>
+            <text fg={t.fg.primary} marginTop={2}>Key Name:</text>
+            <input
+              value={newKeyName}
+              placeholder="my-hetzner-key"
+              focused
+              onInput={(value) => {
+                if (typeof value === "string" && stateRef.current.step === "api_key_name") {
+                  setNewKeyName(value);
+                }
+              }}
+              onSubmit={() => {
+                const nextStep: Step = provider === "digitalocean"
+                  ? "droplet_size"
+                  : activeTemplate ? "ai_api_key_choose" : "ai_provider";
+                handleSaveKeyName(provider, apiKey, nextStep);
+              }}
+              onKeyDown={(e) => {
+                if (e.name === "escape") {
+                  const nextStep: Step = provider === "digitalocean"
+                    ? "droplet_size"
+                    : activeTemplate ? "ai_api_key_choose" : "ai_provider";
+                  setStep(nextStep);
+                }
+              }}
+            />
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to save, Esc to skip</text>
           </box>
         );
 
@@ -667,10 +1023,48 @@ export function NewDeployment({ context }: Props) {
           </box>
         );
 
+      case "ai_api_key_choose":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Step {currentStepNumber("ai_api_key_choose")}: {getAiProviderLabel()} API Key ({getAiProviderHint()})</text>
+            <text fg={t.fg.secondary} marginTop={1}>Choose a saved key or enter a new one:</text>
+            <box
+              flexDirection="column"
+              borderStyle="single"
+              borderColor={t.border.default}
+              marginTop={1}
+              padding={1}
+            >
+              <box flexDirection="row" backgroundColor={selectedSavedKeyIndex === 0 ? t.selection.bg : undefined}>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.indicator : t.fg.primary}>
+                  {selectedSavedKeyIndex === 0 ? "> " : "  "}
+                </text>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.fg : t.fg.primary}>Enter a new API key</text>
+              </box>
+              {savedAiKeys.map((k, i) => {
+                const idx = i + 1;
+                const isSelected = idx === selectedSavedKeyIndex;
+                return (
+                  <box key={k.id} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>
+                      {isSelected ? "> " : "  "}
+                    </text>
+                    <text fg={isSelected ? t.selection.fg : t.fg.primary}>
+                      {k.name} ({k.value.substring(0, 8)}...)
+                    </text>
+                  </box>
+                );
+              })}
+            </box>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
+          </box>
+        );
+
       case "ai_api_key":
         return (
           <box flexDirection="column">
-            <text fg={t.accent}>Step {currentStepNumber("ai_api_key")}: AI Provider API Key</text>
+            <text fg={t.accent}>Step {currentStepNumber("ai_api_key")}: {getAiProviderLabel()} API Key ({getAiProviderHint()})</text>
             <text fg={t.fg.secondary} marginTop={1}>
               Enter your {aiProvider || "AI provider"} API key ({getAiProviderHint()}).
             </text>
@@ -687,16 +1081,52 @@ export function NewDeployment({ context }: Props) {
               onSubmit={() => handleAiApiKeySubmit()}
               onKeyDown={(e) => {
                 if (e.name === "escape") {
-                  if (activeTemplate) {
-                    setStep(provider === "digitalocean" ? "droplet_size" : "api_key");
-                  } else {
-                    setStep("ai_provider");
-                  }
+                  setStep("ai_api_key_choose");
                 }
               }}
             />
             {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
             <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
+          </box>
+        );
+
+      case "ai_api_key_save":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Save {getAiProviderLabel()} API Key</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Would you like to save this {getAiProviderLabel()} API key for future deployments?
+            </text>
+            <text fg={t.status.warning} marginTop={2}>Press Y to save, N to skip</text>
+          </box>
+        );
+
+      case "ai_api_key_name":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Name Your {getAiProviderLabel()} API Key</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Enter a name to identify this key (e.g. 'prod-{aiProvider}', 'my-{aiProvider}'):
+            </text>
+            <text fg={t.fg.primary} marginTop={2}>Key Name:</text>
+            <input
+              value={newKeyName}
+              placeholder="my-anthropic-key"
+              focused
+              onInput={(value) => {
+                if (typeof value === "string" && stateRef.current.step === "ai_api_key_name") {
+                  setNewKeyName(value);
+                }
+              }}
+              onSubmit={() => handleSaveKeyName(aiProvider, aiApiKey, "model")}
+              onKeyDown={(e) => {
+                if (e.name === "escape") {
+                  setStep("model");
+                }
+              }}
+            />
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to save, Esc to skip</text>
           </box>
         );
 
@@ -723,12 +1153,50 @@ export function NewDeployment({ context }: Props) {
               onSubmit={() => handleModelSubmit()}
               onKeyDown={(e) => {
                 if (e.name === "escape") {
-                  setStep("ai_api_key");
+                  setStep("ai_api_key_choose");
                 }
               }}
             />
             {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
             <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
+          </box>
+        );
+
+      case "telegram_token_choose":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Step {currentStepNumber("telegram_token_choose")}: Telegram Bot Token</text>
+            <text fg={t.fg.secondary} marginTop={1}>Choose a saved token or enter a new one:</text>
+            <box
+              flexDirection="column"
+              borderStyle="single"
+              borderColor={t.border.default}
+              marginTop={1}
+              padding={1}
+            >
+              <box flexDirection="row" backgroundColor={selectedSavedKeyIndex === 0 ? t.selection.bg : undefined}>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.indicator : t.fg.primary}>
+                  {selectedSavedKeyIndex === 0 ? "> " : "  "}
+                </text>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.fg : t.fg.primary}>Enter a new bot token</text>
+              </box>
+              {savedTelegramTokens.map((k, i) => {
+                const idx = i + 1;
+                const isSelected = idx === selectedSavedKeyIndex;
+                return (
+                  <box key={k.id} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>
+                      {isSelected ? "> " : "  "}
+                    </text>
+                    <text fg={isSelected ? t.selection.fg : t.fg.primary}>
+                      {k.name} ({k.value.substring(0, 8)}...)
+                    </text>
+                  </box>
+                );
+              })}
+            </box>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
           </box>
         );
 
@@ -755,12 +1223,90 @@ export function NewDeployment({ context }: Props) {
               onSubmit={() => handleTelegramBotTokenSubmit()}
               onKeyDown={(e) => {
                 if (e.name === "escape") {
-                  setStep("model");
+                  setStep("telegram_token_choose");
                 }
               }}
             />
             {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
             <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
+          </box>
+        );
+
+      case "telegram_token_save":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Save Telegram Bot Token</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Would you like to save this bot token for future deployments?
+            </text>
+            <text fg={t.status.warning} marginTop={2}>Press Y to save, N to skip</text>
+          </box>
+        );
+
+      case "telegram_token_name":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Name Your Bot Token</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Enter a name to identify this token (e.g. 'my-bot', 'prod-telegram'):
+            </text>
+            <text fg={t.fg.primary} marginTop={2}>Token Name:</text>
+            <input
+              value={newKeyName}
+              placeholder="my-telegram-bot"
+              focused
+              onInput={(value) => {
+                if (typeof value === "string" && stateRef.current.step === "telegram_token_name") {
+                  setNewKeyName(value);
+                }
+              }}
+              onSubmit={() => handleSaveKeyName("telegram", telegramBotToken, "telegram_allow_choose")}
+              onKeyDown={(e) => {
+                if (e.name === "escape") {
+                  setStep("telegram_allow_choose");
+                }
+              }}
+            />
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to save, Esc to skip</text>
+          </box>
+        );
+
+      case "telegram_allow_choose":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Step {currentStepNumber("telegram_allow_choose")}: Telegram Access Control</text>
+            <text fg={t.fg.secondary} marginTop={1}>Choose a saved user or enter a new one:</text>
+            <box
+              flexDirection="column"
+              borderStyle="single"
+              borderColor={t.border.default}
+              marginTop={1}
+              padding={1}
+            >
+              <box flexDirection="row" backgroundColor={selectedSavedKeyIndex === 0 ? t.selection.bg : undefined}>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.indicator : t.fg.primary}>
+                  {selectedSavedKeyIndex === 0 ? "> " : "  "}
+                </text>
+                <text fg={selectedSavedKeyIndex === 0 ? t.selection.fg : t.fg.primary}>Enter a new user ID or @username</text>
+              </box>
+              {savedTelegramUsers.map((k, i) => {
+                const idx = i + 1;
+                const isSelected = idx === selectedSavedKeyIndex;
+                return (
+                  <box key={k.id} flexDirection="row" backgroundColor={isSelected ? t.selection.bg : undefined}>
+                    <text fg={isSelected ? t.selection.indicator : t.fg.primary}>
+                      {isSelected ? "> " : "  "}
+                    </text>
+                    <text fg={isSelected ? t.selection.fg : t.fg.primary}>
+                      {k.name} ({k.value})
+                    </text>
+                  </box>
+                );
+              })}
+            </box>
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={1}>Press Enter to select, Esc to go back</text>
           </box>
         );
 
@@ -793,12 +1339,52 @@ export function NewDeployment({ context }: Props) {
               onSubmit={() => handleTelegramAllowFromSubmit()}
               onKeyDown={(e) => {
                 if (e.name === "escape") {
-                  setStep("telegram_bot_token");
+                  setStep("telegram_allow_choose");
                 }
               }}
             />
             {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
             <text fg={t.fg.muted} marginTop={2}>Press Enter to continue, Esc to go back</text>
+          </box>
+        );
+
+      case "telegram_allow_save":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Save Telegram User</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Would you like to save this user ID for future deployments?
+            </text>
+            <text fg={t.status.warning} marginTop={2}>Press Y to save, N to skip</text>
+          </box>
+        );
+
+      case "telegram_allow_name":
+        return (
+          <box flexDirection="column">
+            <text fg={t.accent}>Name This Telegram User</text>
+            <text fg={t.fg.secondary} marginTop={1}>
+              Enter a name to identify this user (e.g. 'my-account', 'personal'):
+            </text>
+            <text fg={t.fg.primary} marginTop={2}>Name:</text>
+            <input
+              value={newKeyName}
+              placeholder="my-telegram-user"
+              focused
+              onInput={(value) => {
+                if (typeof value === "string" && stateRef.current.step === "telegram_allow_name") {
+                  setNewKeyName(value);
+                }
+              }}
+              onSubmit={() => handleSaveKeyName("telegram-user", telegramAllowFrom, "confirm")}
+              onKeyDown={(e) => {
+                if (e.name === "escape") {
+                  setStep("confirm");
+                }
+              }}
+            />
+            {error && <text fg={t.status.error} marginTop={1}>{error}</text>}
+            <text fg={t.fg.muted} marginTop={2}>Press Enter to save, Esc to skip</text>
           </box>
         );
 
@@ -903,8 +1489,9 @@ export function NewDeployment({ context }: Props) {
       {/* Progress indicator */}
       <box flexDirection="row" marginBottom={2}>
         {stepList.map((s, i) => {
-          const currentIdx = stepList.indexOf(step);
-          const stepColor = step === s ? t.accent : currentIdx > i ? t.status.success : t.fg.muted;
+          const resolvedStep = resolveStepForProgress(step);
+          const currentIdx = stepList.indexOf(resolvedStep);
+          const stepColor = resolvedStep === s ? t.accent : currentIdx > i ? t.status.success : t.fg.muted;
           return (
             <box key={s} flexDirection="row">
               <text fg={stepColor}>{i + 1}</text>

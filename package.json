@@ -1,29 +1,50 @@
 {
   "name": "clawcontrol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI tool for deploying and managing OpenClaw instances on VPS providers",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "clawcontrol": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "bun --watch src/index.tsx",
     "build": "tsup",
     "start": "bun dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "keywords": [
     "openclaw",
     "cli",
+    "tui",
     "vps",
     "deployment",
     "hetzner",
-    "tui"
+    "digitalocean",
+    "tailscale",
+    "terminal",
+    "automation",
+    "cloud",
+    "ssh",
+    "devops"
   ],
-  "author": "",
+  "author": "Islem Maboud",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ipenywis/clawcontrol.git"
+  },
+  "homepage": "https://github.com/ipenywis/clawcontrol#readme",
+  "bugs": {
+    "url": "https://github.com/ipenywis/clawcontrol/issues"
+  },
   "packageManager": "pnpm@10.25.0",
   "engines": {
     "node": ">=20.0.0"

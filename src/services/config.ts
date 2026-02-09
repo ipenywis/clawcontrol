@@ -241,4 +241,5 @@ export function validateDeploymentName(name: string): { valid: boolean; error?: 
 export const configPaths = {
   root: CLAWCONTROL_DIR,
   deployments: DEPLOYMENTS_DIR,
+  secrets: join(CLAWCONTROL_DIR, "secrets"),
 };
