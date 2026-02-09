@@ -17,6 +17,43 @@ warn()    { printf "${YELLOW}[warn]${RESET}  %s\n" "$*"; }
 error()   { printf "${RED}[error]${RESET} %s\n" "$*" >&2; }
 step()    { printf "\n${BOLD}${CYAN}▸ %s${RESET}\n" "$*"; }
 
+# ─── Helper: ensure a line exists in a shell rc file ────────────────────────
+# Usage: ensure_in_rc "export PATH=..."
+# Writes to .bashrc / .zshrc / fish config depending on the user's shell.
+ensure_in_rc() {
+  local line="$1"
+  local user_shell rc_file
+
+  user_shell="$(basename "${SHELL:-/bin/bash}")"
+  case "$user_shell" in
+    zsh)  rc_file="$HOME/.zshrc" ;;
+    fish) rc_file="$HOME/.config/fish/config.fish" ;;
+    *)    rc_file="$HOME/.bashrc" ;;
+  esac
+
+  # Create the rc file if it doesn't exist
+  if [ ! -f "$rc_file" ]; then
+    touch "$rc_file"
+  fi
+
+  # Only append if the line is not already present
+  if ! grep -qF "$line" "$rc_file" 2>/dev/null; then
+    printf '\n# Added by ClawControl installer\n%s\n' "$line" >> "$rc_file"
+    info "Added to ${rc_file}: ${line}"
+  fi
+}
+
+# ─── Helper: detect the user's shell rc file path ──────────────────────────
+get_shell_rc() {
+  local user_shell
+  user_shell="$(basename "${SHELL:-/bin/bash}")"
+  case "$user_shell" in
+    zsh)  echo "$HOME/.zshrc" ;;
+    fish) echo "$HOME/.config/fish/config.fish" ;;
+    *)    echo "$HOME/.bashrc" ;;
+  esac
+}
+
 # ─── Banner ─────────────────────────────────────────────────────────────────
 printf "${CYAN}${BOLD}"
 cat << 'BANNER'
@@ -141,9 +178,6 @@ else
   success "Installed ${missing[*]}"
 fi
 
-# Track whether we need to reload the shell at the end
-NEEDS_SHELL_RELOAD=false
-
 # ─── Check Bun ──────────────────────────────────────────────────────────────
 step "Checking Bun runtime"
 
@@ -167,12 +201,16 @@ else
   if command -v bun &>/dev/null; then
     BUN_VERSION="$(bun --version)"
     success "Bun v${BUN_VERSION} installed"
-    NEEDS_SHELL_RELOAD=true
   else
     error "Bun installation failed. Please install Bun manually: https://bun.sh"
     exit 1
   fi
 fi
+
+# Ensure ~/.bun/bin is in the shell rc file (Bun's installer is unreliable
+# about doing this, especially when piped via curl)
+ensure_in_rc 'export BUN_INSTALL="$HOME/.bun"'
+ensure_in_rc 'export PATH="$BUN_INSTALL/bin:$PATH"'
 
 # ─── Check Node.js ─────────────────────────────────────────────────────────
 step "Checking Node.js"
@@ -206,7 +244,6 @@ else
     nvm install "$REQUIRED_NODE_MAJOR"
     nvm use "$REQUIRED_NODE_MAJOR"
     success "Node.js $(node -v) installed via nvm"
-    NEEDS_SHELL_RELOAD=true
   else
     info "Installing nvm..."
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
@@ -216,7 +253,6 @@ else
     nvm install "$REQUIRED_NODE_MAJOR"
     nvm use "$REQUIRED_NODE_MAJOR"
     success "Node.js $(node -v) installed via nvm"
-    NEEDS_SHELL_RELOAD=true
   fi
 fi
 
@@ -229,11 +265,31 @@ PKG_INSTALL_CMD="bun add -g clawcontrol"
 info "Running: ${PKG_INSTALL_CMD}"
 $PKG_INSTALL_CMD
 
-if ! command -v clawcontrol &>/dev/null; then
-  warn "clawcontrol was installed but is not in PATH."
-  warn "You may need to open a new terminal or add the global bin directory to PATH."
-else
+# Resolve the actual binary path — Bun global bin is always $BUN_INSTALL/bin
+CLAWCONTROL_BIN="$BUN_INSTALL/bin/clawcontrol"
+
+if [ -x "$CLAWCONTROL_BIN" ]; then
   success "ClawControl installed successfully!"
+elif command -v clawcontrol &>/dev/null; then
+  CLAWCONTROL_BIN="$(command -v clawcontrol)"
+  success "ClawControl installed successfully!"
+else
+  # Last resort: search common global bin locations
+  for candidate in "$HOME/.bun/bin/clawcontrol" "$HOME/.local/bin/clawcontrol" "/usr/local/bin/clawcontrol"; do
+    if [ -x "$candidate" ]; then
+      CLAWCONTROL_BIN="$candidate"
+      break
+    fi
+  done
+
+  if [ -x "${CLAWCONTROL_BIN:-}" ]; then
+    success "ClawControl installed successfully!"
+  else
+    warn "ClawControl was installed but the binary could not be located."
+    warn "Try opening a new terminal and running: clawcontrol"
+    printf "\n"
+    exit 0
+  fi
 fi
 
 # ─── Done ───────────────────────────────────────────────────────────────────
@@ -243,30 +299,46 @@ printf "${GREEN}${BOLD}  ClawControl is ready!${RESET}\n"
 printf "${GREEN}${BOLD}  ──────────────────────────────────────────${RESET}\n"
 printf "\n"
 
-if [ "$NEEDS_SHELL_RELOAD" = true ]; then
-  # Detect the user's shell config file
-  USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
-  case "$USER_SHELL" in
-    zsh)  SHELL_RC="$HOME/.zshrc"   ;;
-    fish) SHELL_RC="$HOME/.config/fish/config.fish" ;;
-    *)    SHELL_RC="$HOME/.bashrc"  ;;
-  esac
+SHELL_RC="$(get_shell_rc)"
 
-  printf "  New tools were installed. Reload your shell to use them:\n"
-  printf "\n"
-  printf "    ${CYAN}source ${SHELL_RC} && clawcontrol${RESET}\n"
-  printf "\n"
-  printf "  Or simply open a ${BOLD}new terminal${RESET} and run:\n"
-  printf "\n"
-  printf "    ${CYAN}clawcontrol${RESET}\n"
+# Ask the user if they want to launch ClawControl right now.
+# We read from /dev/tty because stdin is the piped script when using curl|bash.
+printf "  Would you like to launch ${BOLD}ClawControl${RESET} now? ${CYAN}[Y/n]${RESET} "
+if [ -t 0 ]; then
+  read -r REPLY
 else
-  printf "  Get started:\n"
-  printf "\n"
-  printf "    ${CYAN}clawcontrol${RESET}\n"
+  read -r REPLY < /dev/tty 2>/dev/null || REPLY="n"
 fi
 
+case "${REPLY:-Y}" in
+  [nN]*)
+    printf "\n"
+    printf "  To make ${BOLD}clawcontrol${RESET} available everywhere, reload your shell:\n"
+    printf "\n"
+    printf "    ${CYAN}exec \$SHELL${RESET}\n"
+    printf "    ${CYAN}clawcontrol${RESET}\n"
+    printf "\n"
+    printf "  Or run it right now with the full path:\n"
+    printf "\n"
+    printf "    ${CYAN}${CLAWCONTROL_BIN}${RESET}\n"
+    ;;
+  *)
+    printf "\n"
+    info "Launching ClawControl..."
+    printf "\n"
+    # Run using the resolved full path — bypasses PATH entirely so it works
+    # even before the user has reloaded their shell.
+    "$CLAWCONTROL_BIN"
+
+    printf "\n"
+    printf "  ${DIM}To use ${BOLD}clawcontrol${RESET}${DIM} by name in this terminal, reload your shell:${RESET}\n"
+    printf "\n"
+    printf "    ${CYAN}exec \$SHELL${RESET}\n"
+    ;;
+esac
+
 printf "\n"
-printf "  Then type ${BOLD}/new${RESET} to create your first deployment.\n"
+printf "  Type ${BOLD}/new${RESET} to create your first deployment.\n"
 printf "\n"
 printf "${DIM}  Docs: https://openclaw.ai  •  Issues: https://github.com/ipenywis/clawcontrol/issues${RESET}\n"
 printf "\n"
