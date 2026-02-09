@@ -310,7 +310,7 @@ printf "\n"
 # without the user having to do anything manually.
 # We redirect stdin from /dev/tty so the new shell is interactive (the pipe from
 # curl is exhausted at this point).
-info "Reloading shell so ${BOLD}clawcontrol${RESET} is available..."
+printf "${BLUE}[info]${RESET}  Reloading shell so ${BOLD}clawcontrol${RESET} is available...\n"
 printf "\n"
 if [ -e /dev/tty ]; then
   exec "$SHELL" -l < /dev/tty
