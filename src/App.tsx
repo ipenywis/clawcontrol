@@ -13,6 +13,7 @@ import { DestroyView } from "./components/DestroyView.js";
 import { HelpView } from "./components/HelpView.js";
 import { TemplatesView } from "./components/TemplatesView.js";
 import { DashboardView } from "./components/DashboardView.js";
+import { ChannelsView } from "./components/ChannelsView.js";
 import { getAllDeployments } from "./services/config.js";
 import { t } from "./theme.js";
 
@@ -119,6 +120,8 @@ export function App({ lacksTrueColor }: { lacksTrueColor?: boolean }) {
         return <HelpView context={context} />;
       case "templates":
         return <TemplatesView context={context} />;
+      case "channels":
+        return <ChannelsView context={context} />;
       default:
         return <Home context={context} />;
     }

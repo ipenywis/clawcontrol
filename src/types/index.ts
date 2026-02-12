@@ -257,7 +257,8 @@ export type CommandName =
   | "dashboard"
   | "destroy"
   | "help"
-  | "templates";
+  | "templates"
+  | "channels";
 
 export interface Command {
   name: CommandName;
@@ -278,7 +279,8 @@ export type ViewName =
   | "dashboard"
   | "destroy"
   | "help"
-  | "templates";
+  | "templates"
+  | "channels";
 
 export interface AppState {
   currentView: ViewName;

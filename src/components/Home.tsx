@@ -26,6 +26,7 @@ const COMMANDS = [
   { name: "/logs", description: "View deployment logs" },
   { name: "/dashboard", description: "Open OpenClaw dashboard in browser" },
   { name: "/destroy", description: "Destroy a deployment" },
+  { name: "/channels", description: "View configured channels" },
   { name: "/templates", description: "Manage deployment templates" },
   { name: "/help", description: "Show help" },
 ];
@@ -44,6 +45,7 @@ export function Home({ context }: Props) {
     "/logs": "logs",
     "/dashboard": "dashboard",
     "/destroy": "destroy",
+    "/channels": "channels",
     "/templates": "templates",
     "/help": "help",
   };

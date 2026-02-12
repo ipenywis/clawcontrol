@@ -10,3 +10,4 @@ export { DashboardView } from "./DashboardView.js";
 export { DestroyView } from "./DestroyView.js";
 export { HelpView } from "./HelpView.js";
 export { TemplatesView } from "./TemplatesView.js";
+export { ChannelsView } from "./ChannelsView.js";
